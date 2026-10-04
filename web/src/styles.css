@@ -1,0 +1,143 @@
+/* CREA — Chemical Research Workbench.
+   A workbench, not a chatbot (§105): cards of evidence, knowledge and
+   structure; quiet chrome; the research content is the interface. */
+
+:root {
+  --bg: #f6f7f9;
+  --panel: #ffffff;
+  --ink: #1c2430;
+  --muted: #5c6a7a;
+  --line: #dde3ea;
+  --accent: #1f5fa8;
+  --accent-soft: #e8f0fa;
+  --known: #1d7a4f;
+  --partial: #a3620b;
+  --unknown: #8a94a0;
+  --conflict: #b3372f;
+  font-family: "Segoe UI", "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+}
+
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--ink); }
+a { color: var(--accent); cursor: pointer; text-decoration: none; }
+a:hover { text-decoration: underline; }
+
+.topbar {
+  display: flex; align-items: baseline; gap: 16px;
+  padding: 14px 28px; background: var(--panel); border-bottom: 1px solid var(--line);
+}
+.topbar h1 { font-size: 18px; margin: 0; letter-spacing: 0.04em; }
+.topbar .tagline { color: var(--muted); font-size: 13px; }
+
+.layout { max-width: 1080px; margin: 0 auto; padding: 24px 20px 80px; }
+
+.panel {
+  background: var(--panel); border: 1px solid var(--line); border-radius: 8px;
+  padding: 18px 20px; margin-bottom: 16px;
+}
+.panel h2 {
+  margin: 0 0 12px; font-size: 15px; letter-spacing: 0.05em;
+  color: var(--muted); text-transform: uppercase;
+}
+.panel h3 { margin: 14px 0 8px; font-size: 14px; }
+
+.grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+@media (max-width: 860px) { .grid { grid-template-columns: 1fr; } }
+
+label { display: block; font-size: 13px; color: var(--muted); margin: 10px 0 4px; }
+input[type="text"], textarea, select {
+  width: 100%; padding: 9px 11px; border: 1px solid var(--line);
+  border-radius: 6px; font-size: 14px; background: #fff; color: var(--ink);
+}
+textarea { min-height: 64px; resize: vertical; }
+
+button {
+  padding: 9px 18px; border: 0; border-radius: 6px; cursor: pointer;
+  background: var(--accent); color: #fff; font-size: 14px;
+}
+button.secondary { background: var(--accent-soft); color: var(--accent); }
+button:disabled { opacity: 0.5; cursor: default; }
+button.cancel { background: var(--conflict); }
+
+.badge {
+  display: inline-block; padding: 2px 9px; border-radius: 10px;
+  font-size: 12px; letter-spacing: 0.03em; background: var(--accent-soft);
+  color: var(--accent);
+}
+.badge.known { background: #e2f3ea; color: var(--known); }
+.badge.partially_known { background: #f8ecd9; color: var(--partial); }
+.badge.unknown { background: #eceff2; color: var(--unknown); }
+.badge.conflict { background: #fae5e3; color: var(--conflict); }
+.badge.screening { background: #f8ecd9; color: var(--partial); }
+
+.kv { display: grid; grid-template-columns: 150px 1fr; gap: 4px 12px; font-size: 13px; }
+.kv dt { color: var(--muted); }
+.kv dd { margin: 0; word-break: break-all; }
+
+table { width: 100%; border-collapse: collapse; font-size: 13px; }
+th, td { text-align: left; padding: 7px 9px; border-bottom: 1px solid var(--line); vertical-align: top; }
+th { color: var(--muted); font-weight: 600; }
+
+.events { font-size: 13px; }
+.events li { margin: 4px 0; color: var(--ink); }
+.events .at { color: var(--muted); margin-right: 8px; font-variant-numeric: tabular-nums; }
+
+.report {
+  white-space: pre-wrap; font-family: ui-monospace, "Cascadia Mono", Consolas, monospace;
+  font-size: 12.5px; line-height: 1.55; background: #fbfcfd;
+  border: 1px solid var(--line); border-radius: 6px; padding: 16px; overflow-x: auto;
+}
+
+.mol {
+  border: 1px solid var(--line); border-radius: 6px; background: #fff;
+  padding: 8px; display: inline-block;
+}
+.mol img { display: block; max-width: 320px; }
+
+.muted { color: var(--muted); }
+.error { color: var(--conflict); }
+.mono { font-family: ui-monospace, "Cascadia Mono", Consolas, monospace; font-size: 12px; }
+.note {
+  background: var(--accent-soft); border-radius: 6px; padding: 8px 12px;
+  font-size: 12.5px; color: var(--muted); margin: 8px 0;
+}
+
+.row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.spread { justify-content: space-between; }
+
+.section-sep { border: 0; border-top: 1px solid var(--line); margin: 18px 0; }
+
+/* -- Chemistry Workspace (Stage F) ---------------------------------------- */
+.chat-layout {
+  display: grid; grid-template-columns: 240px 1fr; gap: 16px; align-items: start;
+}
+@media (max-width: 860px) { .chat-layout { grid-template-columns: 1fr; } }
+
+.chat-side h2 { text-transform: uppercase; }
+.ws-list { list-style: none; margin: 8px 0 0; padding: 0; }
+.ws-list li { padding: 8px 10px; border-radius: 6px; margin-bottom: 2px; font-size: 14px; }
+.ws-list li:hover { background: var(--accent-soft); }
+.ws-list li.active { background: var(--accent-soft); font-weight: 600; }
+
+.chat-main { display: flex; flex-direction: column; min-height: 70vh; }
+.chat-messages { flex: 1; display: flex; flex-direction: column; gap: 12px; margin: 4px 0 14px; }
+.chat-msg { max-width: 78%; padding: 10px 14px; border-radius: 10px; font-size: 14px; }
+.chat-msg.user { align-self: flex-end; background: var(--accent-soft); }
+.chat-msg.assistant { align-self: flex-start; background: #fff; border: 1px solid var(--line); }
+.chat-role { font-size: 12px; color: var(--muted); margin-bottom: 3px; }
+.chat-content { white-space: pre-wrap; line-height: 1.5; }
+.chat-typing { font-size: 13px; }
+.chat-details { margin-top: 8px; font-size: 12.5px; }
+.chat-details summary { cursor: pointer; color: var(--muted); }
+.chat-tool { margin: 4px 0; }
+.chat-input { display: flex; gap: 10px; margin-top: 8px; }
+.chat-input input { flex: 1; }
+
+.explore { margin-top: 6px; }
+.explore-candidate { padding: 6px 8px; border: 1px solid var(--line); border-radius: 6px; margin: 6px 0; }
+.explore-candidate .mono { font-family: ui-monospace, "Cascadia Mono", Consolas, monospace; font-size: 12px; }
+
+.reaction-card { border: 1px solid var(--line); border-radius: 8px; padding: 12px 14px; }
+.reaction-card a { font-weight: 600; }
+.reaction-card .muted { margin: 4px 0; }
+.reaction-scheme { font-size: 16px; font-family: ui-monospace, "Cascadia Mono", Consolas, monospace; }

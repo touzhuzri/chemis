@@ -1,0 +1,19 @@
+{
+  "provider": "crossref",
+  "fixture": "doi_metadata",
+  "values": "SYNTHETIC",
+  "is_recorded_response": false,
+  "recorded_at": null,
+  "license_status": "N/A -- synthetic values, no upstream content",
+  "schema": "LIVE_VERIFIED",
+  "schema_verified_at": "2026-09-30",
+  "schema_source": "docs/PHASE2_PROVIDER_CONTRACT.md (crossref)",
+  "schema_unverified": [
+    "abstract JATS XML content -- absent from every record sampled live",
+    "the full set of values link[].intended-application and license[].content-version can take"
+  ],
+  "endpoint": "https://api.crossref.org/works/{doi}  [VERIFIED 2026-09-30]",
+  "contains_full_text": false,
+  "credentials_redacted": true,
+  "note": "Metadata authority record. Its title differs from the OpenAlex one, which is what makes the merge-conflict recording observable. Note the two fields that carry their own scope in the field name: link[].intended-application is 'text-mining' and license[].content-version is 'tdm'. Neither is a general reuse grant."
+}

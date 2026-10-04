@@ -1,0 +1,766 @@
+{
+  "PropertyTable": {
+    "Properties": [
+      {
+        "CID": 702,
+        "MolecularFormula": "C2H6O",
+        "MolecularWeight": "46.07",
+        "SMILES": "CCO",
+        "ConnectivitySMILES": "CCO",
+        "InChI": "InChI=1S/C2H6O/c1-2-3/h3H,2H2,1H3",
+        "InChIKey": "LFQSCWFLJHTTHZ-UHFFFAOYSA-N",
+        "Title": "Ethanol"
+      },
+      {
+        "CID": 8254,
+        "MolecularFormula": "C2H6O",
+        "MolecularWeight": "46.07",
+        "SMILES": "COC",
+        "ConnectivitySMILES": "COC",
+        "InChI": "InChI=1S/C2H6O/c1-3-2/h1-2H3",
+        "InChIKey": "LCGLNKUTAGEVQW-UHFFFAOYSA-N",
+        "Title": "Dimethyl Ether"
+      },
+      {
+        "CID": 102138,
+        "MolecularFormula": "C2H6O",
+        "MolecularWeight": "52.11",
+        "SMILES": "[2H]C([2H])([2H])C([2H])([2H])O[2H]",
+        "ConnectivitySMILES": "CCO",
+        "InChI": "InChI=1S/C2H6O/c1-2-3/h3H,2H2,1H3/i1D3,2D2,3D",
+        "InChIKey": "LFQSCWFLJHTTHZ-LIDOUZCJSA-N",
+        "Title": "Ethyl alcohol-d6"
+      },
+      {
+        "CID": 123093,
+        "MolecularFormula": "C2H6O",
+        "MolecularWeight": "47.07",
+        "SMILES": "[2H]OCC",
+        "ConnectivitySMILES": "CCO",
+        "InChI": "InChI=1S/C2H6O/c1-2-3/h3H,2H2,1H3/i3D",
+        "InChIKey": "LFQSCWFLJHTTHZ-WFVSFCRTSA-N",
+        "Title": "Ethyl [2]alcohol"
+      },
+      {
+        "CID": 12201684,
+        "MolecularFormula": "C2H6O",
+        "MolecularWeight": "47.061",
+        "SMILES": "C[13CH2]O",
+        "ConnectivitySMILES": "CCO",
+        "InChI": "InChI=1S/C2H6O/c1-2-3/h3H,2H2,1H3/i2+1",
+        "InChIKey": "LFQSCWFLJHTTHZ-VQEHIDDOSA-N",
+        "Title": "Ethanol-1-13C"
+      },
+      {
+        "CID": 137238,
+        "MolecularFormula": "C2H6O",
+        "MolecularWeight": "48.08",
+        "SMILES": "[2H]C([2H])(C)O",
+        "ConnectivitySMILES": "CCO",
+        "InChI": "InChI=1S/C2H6O/c1-2-3/h3H,2H2,1H3/i2D2",
+        "InChIKey": "LFQSCWFLJHTTHZ-CBTSVUPCSA-N",
+        "Title": "Ethan-1,1-d2-ol"
+      },
+      {
+        "CID": 519451,
+        "MolecularFormula": "C2H6O",
+        "MolecularWeight": "49.09",
+        "SMILES": "[2H]C([2H])([2H])CO",
+        "ConnectivitySMILES": "CCO",
+        "InChI": "InChI=1S/C2H6O/c1-2-3/h3H,2H2,1H3/i1D3",
+        "InChIKey": "LFQSCWFLJHTTHZ-FIBGUPNXSA-N",
+        "Title": "Ethanol-2,2,2-d3"
+      },
+      {
+        "CID": 12201693,
+        "MolecularFormula": "C2H6O",
+        "MolecularWeight": "51.10",
+        "SMILES": "[2H]C([2H])([2H])C([2H])([2H])O",
+        "ConnectivitySMILES": "CCO",
+        "InChI": "InChI=1S/C2H6O/c1-2-3/h3H,2H2,1H3/i1D3,2D2",
+        "InChIKey": "LFQSCWFLJHTTHZ-ZBJDZAJPSA-N",
+        "Title": "Ethanol-d5"
+      },
+      {
+        "CID": 154994,
+        "MolecularFormula": "C2H6O",
+        "MolecularWeight": "48.061",
+        "SMILES": "C[14CH2]O",
+        "ConnectivitySMILES": "CCO",
+        "InChI": "InChI=1S/C2H6O/c1-2-3/h3H,2H2,1H3/i2+2",
+        "InChIKey": "LFQSCWFLJHTTHZ-HQMMCQRPSA-N",
+        "Title": "Ethanol-1-14C"
+      },
+      {
+        "CID": 6914126,
+        "MolecularFormula": "C2H6O",
+        "MolecularWeight": "52.11",
+        "SMILES": "[2H]C([2H])([2H])OC([2H])([2H])[2H]",
+        "ConnectivitySMILES": "COC",
+        "InChI": "InChI=1S/C2H6O/c1-3-2/h1-2H3/i1D3,2D3",
+        "InChIKey": "LCGLNKUTAGEVQW-WFGJKAKNSA-N",
+        "Title": "Dimethyl ether-d6"
+      },
+      {
+        "CID": 12201694,
+        "MolecularFormula": "C2H6O",
+        "MolecularWeight": "48.054",
+        "SMILES": "[13CH3][13CH2]O",
+        "ConnectivitySMILES": "CCO",
+        "InChI": "InChI=1S/C2H6O/c1-2-3/h3H,2H2,1H3/i1+1,2+1",
+        "InChIKey": "LFQSCWFLJHTTHZ-ZDOIIHCHSA-N",
+        "Title": "Ethanol-13C2"
+      },
+      {
+        "CID": 12201695,
+        "MolecularFormula": "C2H6O",
+        "MolecularWeight": "47.061",
+        "SMILES": "[13CH3]CO",
+        "ConnectivitySMILES": "CCO",
+        "InChI": "InChI=1S/C2H6O/c1-2-3/h3H,2H2,1H3/i1+1",
+        "InChIKey": "LFQSCWFLJHTTHZ-OUBTZVSYSA-N",
+        "Title": "Ethanol-2-13C"
+      },
+      {
+        "CID": 58233034,
+        "MolecularFormula": "C2H6O",
+        "MolecularWeight": "47.07",
+        "SMILES": "CC[17OH]",
+        "ConnectivitySMILES": "CCO",
+        "InChI": "InChI=1S/C2H6O/c1-2-3/h3H,2H2,1H3/i3+1",
+        "InChIKey": "LFQSCWFLJHTTHZ-LBPDFUHNSA-N",
+        "Title": "Ethan(~17~O)ol"
+      },
+      {
+        "CID": 139571,
+        "MolecularFormula": "C2H6O",
+        "MolecularWeight": "49.09",
+        "SMILES": "[2H]C([2H])([2H])OC",
+        "ConnectivitySMILES": "COC",
+        "InChI": "InChI=1S/C2H6O/c1-3-2/h1-2H3/i1D3",
+        "InChIKey": "LCGLNKUTAGEVQW-FIBGUPNXSA-N",
+        "Title": "1,1,1-d3-Dimethyl ether"
+      },
+      {
+        "CID": 22066309,
+        "MolecularFormula": "C2H6O",
+        "MolecularWeight": "46.07",
+        "SMILES": "C=C.O",
+        "ConnectivitySMILES": "C=C.O",
+        "InChI": "InChI=1S/C2H4.H2O/c1-2;/h1-2H2;1H2",
+        "InChIKey": "KVIPHDKUOLVVQN-UHFFFAOYSA-N",
+        "Title": "Ethene--water (1/1)"
+      },
+      {
+        "CID": 12258973,
+        "MolecularFormula": "C2H6O",
+        "MolecularWeight": "48.054",
+        "SMILES": "[13CH3]O[13CH3]",
+        "ConnectivitySMILES": "COC",
+        "InChI": "InChI=1S/C2H6O/c1-3-2/h1-2H3/i1+1,2+1",
+        "InChIKey": "LCGLNKUTAGEVQW-ZDOIIHCHSA-N",
+        "Title": "Methyl ether-13C2"
+      },
+      {
+        "CID": 117064400,
+        "MolecularFormula": "C2H6O",
+        "MolecularWeight": "53.085",
+        "SMILES": "[2H][13C]([2H])([2H])[13C]([2H])([2H])O",
+        "ConnectivitySMILES": "CCO",
+        "InChI": "InChI=1S/C2H6O/c1-2-3/h3H,2H2,1H3/i1+1D3,2+1D2",
+        "InChIKey": "LFQSCWFLJHTTHZ-HXUSQKPVSA-N",
+        "Title": "Ethanol-13C,d5"
+      },
+      {
+        "CID": 450528,
+        "MolecularFormula": "C2H6O",
+        "MolecularWeight": "45.069",
+        "SMILES": "C[11CH2]O",
+        "ConnectivitySMILES": "CCO",
+        "InChI": "InChI=1S/C2H6O/c1-2-3/h3H,2H2,1H3/i2-1",
+        "InChIKey": "LFQSCWFLJHTTHZ-JVVVGQRLSA-N",
+        "Title": "(111C)ethanol"
+      },
+      {
+        "CID": 12201681,
+        "MolecularFormula": "C2H6O",
+        "MolecularWeight": "48.08",
+        "SMILES": "[3H]C(C)O",
+        "ConnectivitySMILES": "CCO",
+        "InChI": "InChI=1S/C2H6O/c1-2-3/h3H,2H2,1H3/i2T",
+        "InChIKey": "LFQSCWFLJHTTHZ-FUPOQFPWSA-N",
+        "Title": "1-Tritioethanol"
+      },
+      {
+        "CID": 12201687,
+        "MolecularFormula": "C2H6O",
+        "MolecularWeight": "47.07",
+        "SMILES": "[2H]C(C)O",
+        "ConnectivitySMILES": "CCO",
+        "InChI": "InChI=1S/C2H6O/c1-2-3/h3H,2H2,1H3/i2D",
+        "InChIKey": "LFQSCWFLJHTTHZ-VMNATFBRSA-N",
+        "Title": "Ethyl-1-D1 alcohol"
+      },
+      {
+        "CID": 12201690,
+        "MolecularFormula": "C2H6O",
+        "MolecularWeight": "48.08",
+        "SMILES": "[2H]C([2H])CO",
+        "ConnectivitySMILES": "CCO",
+        "InChI": "InChI=1S/C2H6O/c1-2-3/h3H,2H2,1H3/i1D2",
+        "InChIKey": "LFQSCWFLJHTTHZ-DICFDUPASA-N",
+        "Title": "2,2-Dideuteroethanol"
+      },
+      {
+        "CID": 15714852,
+        "MolecularFormula": "C2H6O",
+        "MolecularWeight": "50.09",
+        "SMILES": "[2H]C([2H])C([2H])([2H])O",
+        "ConnectivitySMILES": "CCO",
+        "InChI": "InChI=1S/C2H6O/c1-2-3/h3H,2H2,1H3/i1D2,2D2",
+        "InChIKey": "LFQSCWFLJHTTHZ-LNLMKGTHSA-N",
+        "Title": "Tetradeuterioethanol"
+      },
+      {
+        "CID": 23262207,
+        "MolecularFormula": "C2H6O",
+        "MolecularWeight": "47.07",
+        "SMILES": "[2H]CCO",
+        "ConnectivitySMILES": "CCO",
+        "InChI": "InChI=1S/C2H6O/c1-2-3/h3H,2H2,1H3/i1D",
+        "InChIKey": "LFQSCWFLJHTTHZ-MICDWDOJSA-N",
+        "Title": "Ethyl-2-d1 Alcohol"
+      },
+      {
+        "CID": 23262232,
+        "MolecularFormula": "C2H6O",
+        "MolecularWeight": "49.09",
+        "SMILES": "[2H]CC([2H])([2H])O",
+        "ConnectivitySMILES": "CCO",
+        "InChI": "InChI=1S/C2H6O/c1-2-3/h3H,2H2,1H3/i1D,2D2",
+        "InChIKey": "LFQSCWFLJHTTHZ-APAIHEESSA-N",
+        "Title": "Ethanol-d3"
+      },
+      {
+        "CID": 90980219,
+        "MolecularFormula": "C2H6O",
+        "MolecularWeight": "47.07",
+        "SMILES": "[H][C@]([2H])(C)O",
+        "ConnectivitySMILES": "CCO",
+        "InChI": "InChI=1S/C2H6O/c1-2-3/h3H,2H2,1H3/i2D/t2-/m0/s1",
+        "InChIKey": "LFQSCWFLJHTTHZ-SKEHDUAGSA-N",
+        "Title": "(s)-1-Deuterio-ethanol"
+      },
+      {
+        "CID": 91488508,
+        "MolecularFormula": "C2H6O",
+        "MolecularWeight": "48.08",
+        "SMILES": "[2H]COC[2H]",
+        "ConnectivitySMILES": "COC",
+        "InChI": "InChI=1S/C2H6O/c1-3-2/h1-2H3/i1D,2D",
+        "InChIKey": "LCGLNKUTAGEVQW-QDNHWIQGSA-N",
+        "Title": "Deuteriomethyl ether"
+      },
+      {
+        "CID": 101919279,
+        "MolecularFormula": "C2H6O",
+        "MolecularWeight": "47.07",
+        "SMILES": "[H][C@@]([2H])(C)O",
+        "ConnectivitySMILES": "CCO",
+        "InChI": "InChI=1S/C2H6O/c1-2-3/h3H,2H2,1H3/i2D/t2-/m1/s1",
+        "InChIKey": "LFQSCWFLJHTTHZ-DVWNSKMASA-N",
+        "Title": "r-Deutero-1-ethanol"
+      },
+      {
+        "CID": 10285773,
+        "MolecularFormula": "C2H6O",
+        "MolecularWeight": "48.07",
+        "SMILES": "CC[18OH]",
+        "ConnectivitySMILES": "CCO",
+        "InChI": "InChI=1S/C2H6O/c1-2-3/h3H,2H2,1H3/i3+2",
+        "InChIKey": "LFQSCWFLJHTTHZ-YZRHJBSPSA-N",
+        "Title": "Ethanol-18O, 95 atom % 18O"
+      },
+      {
+        "CID": 12201679,
+        "MolecularFormula": "C2H6O",
+        "MolecularWeight": "48.08",
+        "SMILES": "[2H]C(C)O[2H]",
+        "ConnectivitySMILES": "CCO",
+        "InChI": "InChI=1S/C2H6O/c1-2-3/h3H,2H2,1H3/i2D,3D",
+        "InChIKey": "LFQSCWFLJHTTHZ-PBNXXWCMSA-N",
+        "Title": "1-Deuterio-1-deuteriooxyethane"
+      },
+      {
+        "CID": 12201685,
+        "MolecularFormula": "C2H6O",
+        "MolecularWeight": "48.08",
+        "SMILES": "[3H]OCC",
+        "ConnectivitySMILES": "CCO",
+        "InChI": "InChI=1S/C2H6O/c1-2-3/h3H,2H2,1H3/i3T",
+        "InChIKey": "LFQSCWFLJHTTHZ-WJULDGBESA-N",
+        "Title": "Tritiooxyethane"
+      },
+      {
+        "CID": 12201686,
+        "MolecularFormula": "C2H6O",
+        "MolecularWeight": "48.08",
+        "SMILES": "[2H]CC([2H])O",
+        "ConnectivitySMILES": "CCO",
+        "InChI": "InChI=1S/C2H6O/c1-2-3/h3H,2H2,1H3/i1D,2D",
+        "InChIKey": "LFQSCWFLJHTTHZ-QDNHWIQGSA-N",
+        "Title": "1,2-Dideuterioethanol"
+      },
+      {
+        "CID": 12201698,
+        "MolecularFormula": "C2H6O",
+        "MolecularWeight": "50.09",
+        "SMILES": "[2H]C([2H])([2H])CO[2H]",
+        "ConnectivitySMILES": "CCO",
+        "InChI": "InChI=1S/C2H6O/c1-2-3/h3H,2H2,1H3/i1D3,3D",
+        "InChIKey": "LFQSCWFLJHTTHZ-VYMTUXDUSA-N",
+        "Title": "1,1,1-Trideuterio-2-deuteriooxyethane"
+      },
+      {
+        "CID": 18655806,
+        "MolecularFormula": "C2H6O",
+        "MolecularWeight": "58.12",
+        "SMILES": "[3H]C([3H])([3H])C([3H])([3H])O[3H]",
+        "ConnectivitySMILES": "CCO",
+        "InChI": "InChI=1S/C2H6O/c1-2-3/h3H,2H2,1H3/i1T3,2T2,3T",
+        "InChIKey": "LFQSCWFLJHTTHZ-DRJNCETJSA-N",
+        "Title": "1,1,1,2,2-Pentatritio-2-tritiooxyethane"
+      },
+      {
+        "CID": 19827224,
+        "MolecularFormula": "C2H6O",
+        "MolecularWeight": "46.07",
+        "SMILES": "C.C=O",
+        "ConnectivitySMILES": "C.C=O",
+        "InChI": "InChI=1S/CH2O.CH4/c1-2;/h1H2;1H4",
+        "InChIKey": "LSNXEANQILECTB-UHFFFAOYSA-N",
+        "Title": "Formaldehyde;methane"
+      },
+      {
+        "CID": 23262246,
+        "MolecularFormula": "C2H6O",
+        "MolecularWeight": "50.09",
+        "SMILES": "[2H]C(C([2H])([2H])[2H])O",
+        "ConnectivitySMILES": "CCO",
+        "InChI": "InChI=1S/C2H6O/c1-2-3/h3H,2H2,1H3/i1D3,2D",
+        "InChIKey": "LFQSCWFLJHTTHZ-MZCSYVLQSA-N",
+        "Title": "Ethyl-1,2,2,2-d4 Alcohol"
+      },
+      {
+        "CID": 53639810,
+        "MolecularFormula": "C2H6O",
+        "MolecularWeight": "47.07",
+        "SMILES": "[2H]COC",
+        "ConnectivitySMILES": "COC",
+        "InChI": "InChI=1S/C2H6O/c1-3-2/h1-2H3/i1D",
+        "InChIKey": "LCGLNKUTAGEVQW-MICDWDOJSA-N",
+        "Title": "Deuterio(methoxy)methane"
+      },
+      {
+        "CID": 54031105,
+        "MolecularFormula": "C2H6O",
+        "MolecularWeight": "48.08",
+        "SMILES": "[3H]CCO",
+        "ConnectivitySMILES": "CCO",
+        "InChI": "InChI=1S/C2H6O/c1-2-3/h3H,2H2,1H3/i1T",
+        "InChIKey": "LFQSCWFLJHTTHZ-CNRUNOGKSA-N",
+        "Title": "2-Tritioethanol"
+      },
+      {
+        "CID": 58133317,
+        "MolecularFormula": "C2H6O",
+        "MolecularWeight": "48.08",
+        "SMILES": "[2H]C([2H])OC",
+        "ConnectivitySMILES": "COC",
+        "InChI": "InChI=1S/C2H6O/c1-3-2/h1-2H3/i1D2",
+        "InChIKey": "LCGLNKUTAGEVQW-DICFDUPASA-N",
+        "Title": "Dideuterio(methoxy)methane"
+      },
+      {
+        "CID": 58150845,
+        "MolecularFormula": "C2H6O",
+        "MolecularWeight": "50.080",
+        "SMILES": "[2H][13C]([2H])(C)O[2H]",
+        "ConnectivitySMILES": "CCO",
+        "InChI": "InChI=1S/C2H6O/c1-2-3/h3H,2H2,1H3/i2+1D2,3D",
+        "InChIKey": "LFQSCWFLJHTTHZ-LLNDFAASSA-N",
+        "Title": "1,1-dideuterio-1-deuteriooxy(113C)ethane"
+      },
+      {
+        "CID": 58159131,
+        "MolecularFormula": "C2H6O",
+        "MolecularWeight": "47.07",
+        "SMILES": "[1H]C([2H])(C)O",
+        "ConnectivitySMILES": "CCO",
+        "InChI": "InChI=1S/C2H6O/c1-2-3/h3H,2H2,1H3/i2DH",
+        "InChIKey": "LFQSCWFLJHTTHZ-GOHYHQFESA-N",
+        "Title": "1-Deuterio-1-protioethanol"
+      },
+      {
+        "CID": 58750505,
+        "MolecularFormula": "C2H6O",
+        "MolecularWeight": "47.07",
+        "SMILES": "C[17O]C",
+        "ConnectivitySMILES": "COC",
+        "InChI": "InChI=1S/C2H6O/c1-3-2/h1-2H3/i3+1",
+        "InChIKey": "LCGLNKUTAGEVQW-LBPDFUHNSA-N",
+        "Title": "(17O)methoxymethane"
+      },
+      {
+        "CID": 59096442,
+        "MolecularFormula": "C2H6O",
+        "MolecularWeight": "46.07",
+        "SMILES": "[1H]OCC",
+        "ConnectivitySMILES": "CCO",
+        "InChI": "InChI=1S/C2H6O/c1-2-3/h3H,2H2,1H3/i3H",
+        "InChIKey": "LFQSCWFLJHTTHZ-HNNAGVGSSA-N",
+        "Title": "Protiooxyethane"
+      },
+      {
+        "CID": 59097177,
+        "MolecularFormula": "C2H6O",
+        "MolecularWeight": "50.09",
+        "SMILES": "[2H]C(C[3H])O[2H]",
+        "ConnectivitySMILES": "CCO",
+        "InChI": "InChI=1S/C2H6O/c1-2-3/h3H,2H2,1H3/i1T,2D,3D",
+        "InChIKey": "LFQSCWFLJHTTHZ-STKIBECBSA-N",
+        "Title": "1-Deuterio-1-deuteriooxy-2-tritioethane"
+      },
+      {
+        "CID": 59097189,
+        "MolecularFormula": "C2H6O",
+        "MolecularWeight": "49.08",
+        "SMILES": "[2H]COC[3H]",
+        "ConnectivitySMILES": "COC",
+        "InChI": "InChI=1S/C2H6O/c1-3-2/h1-2H3/i1D,2T",
+        "InChIKey": "LCGLNKUTAGEVQW-PKTJCQLPSA-N",
+        "Title": "Deuteriomethoxy(tritio)methane"
+      },
+      {
+        "CID": 59990128,
+        "MolecularFormula": "C2H6O",
+        "MolecularWeight": "48.08",
+        "SMILES": "[3H]COC",
+        "ConnectivitySMILES": "COC",
+        "InChI": "InChI=1S/C2H6O/c1-3-2/h1-2H3/i1T",
+        "InChIKey": "LCGLNKUTAGEVQW-CNRUNOGKSA-N",
+        "Title": "Methoxy(tritio)methane"
+      },
+      {
+        "CID": 60130942,
+        "MolecularFormula": "C2H6O",
+        "MolecularWeight": "46.07",
+        "SMILES": "C[CH-][OH2+]",
+        "ConnectivitySMILES": "C[CH-][OH2+]",
+        "InChI": "InChI=1S/C2H6O/c1-2-3/h2H,3H2,1H3",
+        "InChIKey": "IZRWEMRADYDKSZ-UHFFFAOYSA-N",
+        "Title": "Ethyloxidanium"
+      },
+      {
+        "CID": 88186682,
+        "MolecularFormula": "C2H6O",
+        "MolecularWeight": "56.11",
+        "SMILES": "[3H]C([3H])([3H])C([3H])([3H])O",
+        "ConnectivitySMILES": "CCO",
+        "InChI": "InChI=1S/C2H6O/c1-2-3/h3H,2H2,1H3/i1T3,2T2",
+        "InChIKey": "LFQSCWFLJHTTHZ-CGKQETKWSA-N",
+        "Title": "1,1,2,2,2-Pentatritioethanol"
+      },
+      {
+        "CID": 123250604,
+        "MolecularFormula": "C2H6O",
+        "MolecularWeight": "45.069",
+        "SMILES": "CO[11CH3]",
+        "ConnectivitySMILES": "COC",
+        "InChI": "InChI=1S/C2H6O/c1-3-2/h1-2H3/i1-1",
+        "InChIKey": "LCGLNKUTAGEVQW-BJUDXGSMSA-N",
+        "Title": "methoxy(111C)methane"
+      },
+      {
+        "CID": 123637933,
+        "MolecularFormula": "C2H6O",
+        "MolecularWeight": "44.070",
+        "SMILES": "[11CH3]O[11CH3]",
+        "ConnectivitySMILES": "COC",
+        "InChI": "InChI=1S/C2H6O/c1-3-2/h1-2H3/i1-1,2-1",
+        "InChIKey": "LCGLNKUTAGEVQW-BHBJOZJASA-N",
+        "Title": "(111C)methoxy(111C)methane"
+      },
+      {
+        "CID": 159336914,
+        "MolecularFormula": "C2H6O",
+        "MolecularWeight": "44.075",
+        "SMILES": "C[10CH2]O",
+        "ConnectivitySMILES": "CCO",
+        "InChI": "InChI=1S/C2H6O/c1-2-3/h3H,2H2,1H3/i2-2",
+        "InChIKey": "LFQSCWFLJHTTHZ-FXLNFKNVSA-N",
+        "Title": "(110C)ethanol"
+      },
+      {
+        "CID": 159336916,
+        "MolecularFormula": "C2H6O",
+        "MolecularWeight": "49.068",
+        "SMILES": "C[15CH2]O",
+        "ConnectivitySMILES": "CCO",
+        "InChI": "InChI=1S/C2H6O/c1-2-3/h3H,2H2,1H3/i2+3",
+        "InChIKey": "LFQSCWFLJHTTHZ-JYZZZDIKSA-N",
+        "Title": "(115C)ethanol"
+      },
+      {
+        "CID": 159336917,
+        "MolecularFormula": "C2H6O",
+        "MolecularWeight": "54.098",
+        "SMILES": "C[20CH2]O",
+        "ConnectivitySMILES": "CCO",
+        "InChI": "InChI=1S/C2H6O/c1-2-3/h3H,2H2,1H3/i2+8",
+        "InChIKey": "LFQSCWFLJHTTHZ-NPWCHAOPSA-N",
+        "Title": "(120C)ethanol"
+      },
+      {
+        "CID": 159444110,
+        "MolecularFormula": "C2H6O",
+        "MolecularWeight": "48.08",
+        "SMILES": "[2H]C.[2H]C=O",
+        "ConnectivitySMILES": "C.C=O",
+        "InChI": "InChI=1S/CH2O.CH4/c1-2;/h1H2;1H4/i2*1D",
+        "InChIKey": "LSNXEANQILECTB-JDNDXYCVSA-N",
+        "Title": "Deuterioformaldehyde;deuteriomethane"
+      },
+      {
+        "CID": 159444111,
+        "MolecularFormula": "C2H6O",
+        "MolecularWeight": "48.08",
+        "SMILES": "[3H]C=O.C",
+        "ConnectivitySMILES": "C.C=O",
+        "InChI": "InChI=1S/CH2O.CH4/c1-2;/h1H2;1H4/i1T;",
+        "InChIKey": "LSNXEANQILECTB-PXDSPCEXSA-N",
+        "Title": "Methane;tritioformaldehyde"
+      },
+      {
+        "CID": 167712766,
+        "MolecularFormula": "C2H6O",
+        "MolecularWeight": "46.07",
+        "SMILES": "[HH].C.[C-]#[O+]",
+        "ConnectivitySMILES": "[HH].C.[C-]#[O+]",
+        "InChI": "InChI=1S/CO.CH4.H2/c1-2;;/h;1H4;1H",
+        "InChIKey": "RBPBTMPNOMLMHP-UHFFFAOYSA-N",
+        "Title": "Carbon monoxide;methane;molecular hydrogen"
+      },
+      {
+        "CID": 173090156,
+        "MolecularFormula": "C2H6O",
+        "MolecularWeight": "46.07",
+        "SMILES": "[HH].C1CO1",
+        "ConnectivitySMILES": "[HH].C1CO1",
+        "InChI": "InChI=1S/C2H4O.H2/c1-2-3-1;/h1-2H2;1H",
+        "InChIKey": "HRCLAXKEEHGLFU-UHFFFAOYSA-N",
+        "Title": "Molecular hydrogen;oxirane"
+      },
+      {
+        "CID": 173220398,
+        "MolecularFormula": "C2H6O",
+        "MolecularWeight": "46.07",
+        "SMILES": "[CH3+].[CH3+].[O-2]",
+        "ConnectivitySMILES": "[CH3+].[CH3+].[O-2]",
+        "InChI": "InChI=1S/2CH3.O/h2*1H3;/q2*+1;-2",
+        "InChIKey": "HHHMUPDNFBHYOO-UHFFFAOYSA-N",
+        "Title": "Carbanylium;oxygen(2-)"
+      },
+      {
+        "CID": 173437763,
+        "MolecularFormula": "C2H6O",
+        "MolecularWeight": "47.07",
+        "SMILES": "[2H+].CC[O-]",
+        "ConnectivitySMILES": "[H+].CC[O-]",
+        "InChI": "InChI=1S/C2H5O/c1-2-3/h2H2,1H3/q-1/p+1/i/hD",
+        "InChIKey": "HHFAWKCIHAUFRX-DYCDLGHISA-O",
+        "Title": "Deuteron;ethanolate"
+      },
+      {
+        "CID": 173787655,
+        "MolecularFormula": "C2H6O",
+        "MolecularWeight": "46.07",
+        "SMILES": "[H+].[H+].C=C.[O-2]",
+        "ConnectivitySMILES": "[H+].[H+].C=C.[O-2]",
+        "InChI": "InChI=1S/C2H4.O/c1-2;/h1-2H2;/q;-2/p+2",
+        "InChIKey": "NSLFHRIGGUKWAN-UHFFFAOYSA-P",
+        "Title": "Ethene;hydron;oxygen(2-)"
+      },
+      {
+        "CID": 174351601,
+        "MolecularFormula": "C2H6O",
+        "MolecularWeight": "46.07",
+        "SMILES": "[HH].CC=O",
+        "ConnectivitySMILES": "[HH].CC=O",
+        "InChI": "InChI=1S/C2H4O.H2/c1-2-3;/h2H,1H3;1H",
+        "InChIKey": "KSPYZESUUOPFDY-UHFFFAOYSA-N",
+        "Title": "Acetaldehyde;molecular hydrogen"
+      },
+      {
+        "CID": 175605724,
+        "MolecularFormula": "C2H6O",
+        "MolecularWeight": "50.09",
+        "SMILES": "[2H]C([2H])OC([2H])[2H]",
+        "ConnectivitySMILES": "COC",
+        "InChI": "InChI=1S/C2H6O/c1-3-2/h1-2H3/i1D2,2D2",
+        "InChIKey": "LCGLNKUTAGEVQW-LNLMKGTHSA-N",
+        "Title": "Dideuterio(dideuteriomethoxy)methane"
+      },
+      {
+        "CID": 176197891,
+        "MolecularFormula": "C2H6O",
+        "MolecularWeight": "43.089",
+        "SMILES": "C[9CH2]O",
+        "ConnectivitySMILES": "CCO",
+        "InChI": "InChI=1S/C2H6O/c1-2-3/h3H,2H2,1H3/i2-3",
+        "InChIKey": "LFQSCWFLJHTTHZ-VXRSTAEKSA-N",
+        "Title": "(19C)ethanol"
+      },
+      {
+        "CID": 23262245,
+        "MolecularFormula": "C2H6O",
+        "MolecularWeight": "49.09",
+        "SMILES": "[2H]C([2H])C([2H])O",
+        "ConnectivitySMILES": "CCO",
+        "InChI": "InChI=1S/C2H6O/c1-2-3/h3H,2H2,1H3/i1D2,2D",
+        "InChIKey": "LFQSCWFLJHTTHZ-FUDHJZNOSA-N",
+        "Title": "1,2,2-Trideuterioethanol"
+      },
+      {
+        "CID": 90476419,
+        "MolecularFormula": "C2H6O",
+        "MolecularWeight": "50.08",
+        "SMILES": "[3H]C([3H])(C)O",
+        "ConnectivitySMILES": "CCO",
+        "InChI": "InChI=1S/C2H6O/c1-2-3/h3H,2H2,1H3/i2T2",
+        "InChIKey": "LFQSCWFLJHTTHZ-BMCFWTDKSA-N",
+        "Title": "1,1-Ditritioethanol"
+      },
+      {
+        "CID": 101213162,
+        "MolecularFormula": "C2H6O",
+        "MolecularWeight": "50.08",
+        "SMILES": "[3H]CC([3H])O",
+        "ConnectivitySMILES": "CCO",
+        "InChI": "InChI=1S/C2H6O/c1-2-3/h3H,2H2,1H3/i1T,2T",
+        "InChIKey": "LFQSCWFLJHTTHZ-RVQWGROCSA-N",
+        "Title": "1,2-Ditritioethanol"
+      },
+      {
+        "CID": 101911267,
+        "MolecularFormula": "C2H6O",
+        "MolecularWeight": "51.086",
+        "SMILES": "[2H]C([2H])([2H])[13CH2]O[2H]",
+        "ConnectivitySMILES": "CCO",
+        "InChI": "InChI=1S/C2H6O/c1-2-3/h3H,2H2,1H3/i1D3,2+1,3D",
+        "InChIKey": "LFQSCWFLJHTTHZ-CTXXVOKWSA-N",
+        "Title": "1,1,1-trideuterio-2-deuteriooxy(213C)ethane"
+      },
+      {
+        "CID": 102003372,
+        "MolecularFormula": "C2H6O",
+        "MolecularWeight": "48.08",
+        "SMILES": "[2H]CCO[2H]",
+        "ConnectivitySMILES": "CCO",
+        "InChI": "InChI=1S/C2H6O/c1-2-3/h3H,2H2,1H3/i1D,3D",
+        "InChIKey": "LFQSCWFLJHTTHZ-SDTNDFKLSA-N",
+        "Title": "1-Deuterio-2-deuteriooxyethane"
+      },
+      {
+        "CID": 102241247,
+        "MolecularFormula": "C2H6O+",
+        "MolecularWeight": "47.07",
+        "SMILES": "[2H][OH+][CH]C",
+        "ConnectivitySMILES": "C[CH][OH2+]",
+        "InChI": "InChI=1S/C2H5O/c1-2-3/h2-3H,1H3/p+1/i3D",
+        "InChIKey": "GAWIXWVDTYZWAW-WFVSFCRTSA-O",
+        "Title": "CID 102241247"
+      },
+      {
+        "CID": 102241248,
+        "MolecularFormula": "C2H6O+",
+        "MolecularWeight": "48.08",
+        "SMILES": "[2H][C]([2H])C[OH2+]",
+        "ConnectivitySMILES": "[CH2]C[OH2+]",
+        "InChI": "InChI=1S/C2H5O/c1-2-3/h3H,1-2H2/p+1/i1D2",
+        "InChIKey": "HVFGPIFTSJJAKK-DICFDUPASA-O",
+        "Title": "CID 102241248"
+      },
+      {
+        "CID": 102461127,
+        "MolecularFormula": "C2H6O+",
+        "MolecularWeight": "46.07",
+        "SMILES": "[CH2]C[OH2+]",
+        "ConnectivitySMILES": "[CH2]C[OH2+]",
+        "InChI": "InChI=1S/C2H5O/c1-2-3/h3H,1-2H2/p+1",
+        "InChIKey": "HVFGPIFTSJJAKK-UHFFFAOYSA-O",
+        "Title": "CID 102461127"
+      },
+      {
+        "CID": 117064639,
+        "MolecularFormula": "C2H6O",
+        "MolecularWeight": "52.092",
+        "SMILES": "[2H]C([2H])([2H])[13C]([2H])([2H])O",
+        "ConnectivitySMILES": "CCO",
+        "InChI": "InChI=1S/C2H6O/c1-2-3/h3H,2H2,1H3/i1D3,2+1D2",
+        "InChIKey": "LFQSCWFLJHTTHZ-SVDORZFLSA-N",
+        "Title": "Ethanol-1-13C,d5, 99 atom % 13C, 98 atom % D"
+      },
+      {
+        "CID": 122236651,
+        "MolecularFormula": "C2H6O",
+        "MolecularWeight": "49.09",
+        "SMILES": "[2H]C([2H])(C)O[2H]",
+        "ConnectivitySMILES": "CCO",
+        "InChI": "InChI=1S/C2H6O/c1-2-3/h3H,2H2,1H3/i2D2,3D",
+        "InChIKey": "LFQSCWFLJHTTHZ-UHVFUKFASA-N",
+        "Title": "Ethyl-1,1-d2 Alcohol-OD"
+      },
+      {
+        "CID": 122364591,
+        "MolecularFormula": "C2H6O",
+        "MolecularWeight": "48.061",
+        "SMILES": "[14CH3]CO",
+        "ConnectivitySMILES": "CCO",
+        "InChI": "InChI=1S/C2H6O/c1-2-3/h3H,2H2,1H3/i1+2",
+        "InChIKey": "LFQSCWFLJHTTHZ-NJFSPNSNSA-N",
+        "Title": "(214C)ethanol"
+      },
+      {
+        "CID": 138962772,
+        "MolecularFormula": "C2H6O",
+        "MolecularWeight": "48.08",
+        "SMILES": "[H][C@@]([2H])(C[2H])O",
+        "ConnectivitySMILES": "CCO",
+        "InChI": "InChI=1S/C2H6O/c1-2-3/h3H,2H2,1H3/i1D,2D/t2-/m1/s1",
+        "InChIKey": "LFQSCWFLJHTTHZ-XVUBXAANSA-N",
+        "Title": "(1R)-1,2-dideuterioethanol"
+      },
+      {
+        "CID": 161677703,
+        "MolecularFormula": "C2H6O",
+        "MolecularWeight": "47.07",
+        "SMILES": "[1H][C@@]([2H])(C)O",
+        "ConnectivitySMILES": "CCO",
+        "InChI": "InChI=1S/C2H6O/c1-2-3/h3H,2H2,1H3/i2DH/t2-/m1/s1",
+        "InChIKey": "LFQSCWFLJHTTHZ-DHACFTNQSA-N",
+        "Title": "(1R)-1-deuterio-1-protioethanol"
+      },
+      {
+        "CID": 177555036,
+        "MolecularFormula": "C2H6O+",
+        "MolecularWeight": "46.07",
+        "SMILES": "CC[OH+]",
+        "ConnectivitySMILES": "CC[OH+]",
+        "InChI": "InChI=1S/C2H6O/c1-2-3/h3H,2H2,1H3/q+1",
+        "InChIKey": "MMFGLAVKOXZMDF-UHFFFAOYSA-N",
+        "Title": "CID 177555036"
+      }
+    ]
+  }
+}

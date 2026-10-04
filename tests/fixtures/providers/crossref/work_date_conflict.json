@@ -1,0 +1,49 @@
+{
+  "status": "ok",
+  "message-type": "work",
+  "message": {
+    "DOI": "10.0000/synthetic.2026.0098",
+    "title": [
+      "A work whose dates disagree"
+    ],
+    "container-title": [
+      "Journal of Synthetic Chemistry"
+    ],
+    "issued": {
+      "date-parts": [
+        [
+          2019,
+          1,
+          1
+        ]
+      ]
+    },
+    "published-print": {
+      "date-parts": [
+        [
+          2021,
+          6,
+          1
+        ]
+      ]
+    },
+    "published-online": {
+      "date-parts": [
+        [
+          2020,
+          12,
+          1
+        ]
+      ]
+    },
+    "created": {
+      "date-parts": [
+        [
+          2021,
+          7,
+          1
+        ]
+      ]
+    }
+  }
+}

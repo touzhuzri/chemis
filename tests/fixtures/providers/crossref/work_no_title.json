@@ -1,0 +1,29 @@
+{
+  "status": "ok",
+  "message-type": "work",
+  "message": {
+    "DOI": "10.0000/synthetic.2026.0099",
+    "title": [],
+    "container-title": [],
+    "publisher": "Example Synthetic Press",
+    "type": "journal-article",
+    "issued": {
+      "date-parts": [
+        [
+          2020
+        ]
+      ]
+    },
+    "created": {
+      "date-parts": [
+        [
+          2020,
+          9,
+          1
+        ]
+      ]
+    },
+    "license": [],
+    "link": []
+  }
+}

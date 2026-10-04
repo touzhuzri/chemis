@@ -1,0 +1,33 @@
+{
+  "_synthetic_values": true,
+  "doi": "10.0000/synthetic.2026.0001",
+  "title": "Synthesis of 1,4-diphenyl-1,3-diyne by oxidative coupling",
+  "year": 2021,
+  "is_oa": true,
+  "oa_status": "green",
+  "journal_name": "Journal of Synthetic Chemistry",
+  "journal_issn_l": "0000-0000",
+  "journal_is_oa": true,
+  "journal_is_in_doaj": true,
+  "publisher": "Example Synthetic Press",
+  "genre": "journal-article",
+  "has_repository_copy": true,
+  "best_oa_location": {
+    "endpoint_id": null,
+    "evidence": "deprecated",
+    "host_type": "repository",
+    "is_best": true,
+    "license": "cc-by",
+    "oa_date": "2021-05-01",
+    "pmh_id": null,
+    "repository_institution": "Example Repository",
+    "updated": "deprecated",
+    "url": "https://example.org/pdf/1",
+    "url_for_landing_page": "https://doi.org/10.0000/synthetic.2026.0001",
+    "url_for_pdf": "https://example.org/pdf/1",
+    "version": "publishedVersion"
+  },
+  "oa_locations": [],
+  "oa_locations_embargoed": [],
+  "data_standard": 2
+}

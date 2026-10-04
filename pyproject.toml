@@ -1,0 +1,49 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "crea"
+version = "0.1.0"
+description = "Chemical Research Agent - Phase 1 Chemical Core (Scenario A)"
+requires-python = ">=3.10"
+license = { text = "Proprietary" }
+
+# Pinned. RDKit is the single chemical dependency and is NOT optional.
+dependencies = [
+    "rdkit==2026.3.6",
+    "numpy>=1.26",
+    "pydantic>=2.7,<3",
+    # Local PDF text extraction for user-supplied documents. BSD-3-Clause,
+    # verified against the upstream LICENSE. PyMuPDF stays excluded: AGPL-3.0.
+    # Pinned, like rdkit, because the parse layer's output is part of our
+    # evidence provenance and a silent version bump would change quoted text.
+    "pypdf==6.19.0",
+    # The workbench (Phase 4): FastAPI + uvicorn serve the HTTP API and the
+    # built frontend from one process. No ORM -- persistence stays
+    # repository + sqlite3.
+    "fastapi>=0.115",
+    "uvicorn>=0.30",
+    "python-multipart>=0.0.9",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8.0"]
+# The default suite needs no network dependency. This extra is for live tests
+# only (`pytest -m live` with CREA_ENABLE_LIVE=1).
+live = ["httpx>=0.27"]
+
+[project.scripts]
+crea = "crea.cli:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/crea"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = [
+    "phase2: deferred to Phase 2 (Scenario B/C), interface reserved only",
+    "spike: probes RDKit API semantics that the architecture depends on",
+    "live: opt-in tests that call real external APIs. Never in the default suite; require CREA_ENABLE_LIVE=1 and are not in the CI gate.",
+]
+filterwarnings = ["ignore::DeprecationWarning"]

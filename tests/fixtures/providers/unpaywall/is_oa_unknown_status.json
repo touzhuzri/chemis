@@ -1,0 +1,24 @@
+{
+  "_synthetic_values": true,
+  "doi": "10.0000/synthetic.2027.0101",
+  "title": "A record with a status our enum does not model",
+  "year": 2027,
+  "is_oa": true,
+  "oa_status": "platinum",
+  "best_oa_location": {
+    "endpoint_id": null,
+    "evidence": "deprecated",
+    "host_type": "publisher",
+    "is_best": true,
+    "license": "cc0",
+    "oa_date": "2027-01-01",
+    "pmh_id": null,
+    "repository_institution": null,
+    "updated": "deprecated",
+    "url": "https://example.org/pdf/101",
+    "url_for_landing_page": "https://doi.org/10.0000/synthetic.2027.0101",
+    "url_for_pdf": "https://example.org/pdf/101",
+    "version": "publishedVersion"
+  },
+  "oa_locations": []
+}

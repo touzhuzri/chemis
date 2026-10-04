@@ -1,0 +1,18 @@
+{
+  "provider": "unpaywall",
+  "fixture": "is_oa_green",
+  "values": "SYNTHETIC",
+  "is_recorded_response": false,
+  "recorded_at": null,
+  "license_status": "N/A -- synthetic values, no upstream content",
+  "schema": "LIVE_VERIFIED",
+  "schema_verified_at": "2026-09-30",
+  "schema_source": "docs/PHASE2_PROVIDER_CONTRACT.md (unpaywall)",
+  "schema_unverified": [
+    "oa_status value set beyond closed/gold observed live"
+  ],
+  "endpoint": "https://api.unpaywall.org/v2/{doi}?email=...  [VERIFIED 2026-09-30]",
+  "contains_full_text": false,
+  "credentials_redacted": true,
+  "note": "Green OA with an explicit CC-BY licence: the only fixture that should reach MAY_RETRIEVE, and only because of the licence, not the URL."
+}

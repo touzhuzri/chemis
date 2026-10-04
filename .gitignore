@@ -1,0 +1,73 @@
+# Secrets and credentials. Nothing in this section may ever be committed:
+# `.env` holds live API keys for Crossref/OpenAlex/Unpaywall and an LLM.
+.env
+.env.*
+!.env.example
+*.key
+*.pem
+*.p12
+*.pfx
+*.p8
+*.crt
+*.cer
+*credentials*
+*secret*
+
+# The isolated worker runtimes and their model/stock data: the
+# retrosynthesis engine, and the optional DECIMER image recogniser (Phase
+# 3.6). Tens to hundreds of megabytes of trained weights and a second
+# interpreter each; never in git. See docs/RETROSYNTHESIS_RUNTIME.md and
+# docs/PHASE36_DECIMER_LICENSES.md -- the weights are also licence-uncleared,
+# which is a second reason they stay out.
+runtime/
+runtime/aizynthfinder-env/
+runtime/decimer-env/
+
+# Trained weights and model files, wherever they land. `runtime/` above is
+# the expected home, but a download that lands in the repository root must
+# not become committable by accident. JSON stays tracked: the offline test
+# fixtures are JSON with `.meta.json` beside them, and those are source.
+*.h5
+*.hdf5
+*.pt
+*.pth
+*.ckpt
+*.ckpt.*
+*.onnx
+*.pb
+*.tflite
+*.safetensors
+*.joblib
+*.npz
+*.weights
+*.caffemodel
+
+# Python
+.venv/
+venv/
+__pycache__/
+*.pyc
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.tmp/
+
+# Frontend dependencies (Phase 4). The built bundle `web/dist/` is
+# committed so `python -m crea.cli serve` works out of the box; rebuild it
+# with `npm install && npm run build`.
+web/node_modules/
+
+# Build and distribution
+dist/
+build/
+
+# Local output and working data
+data/
+out/
+
+# Scratch left by exploratory AiZynthFinder runs (see the `.azf*` prefix:
+# dumped module sources and JSON caches, regenerated on demand).
+# Ignore-only -- nothing is deleted.
+.azf*

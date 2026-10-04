@@ -1,0 +1,18 @@
+{
+  "provider": "unpaywall",
+  "fixture": "is_oa_bronze",
+  "values": "SYNTHETIC",
+  "is_recorded_response": false,
+  "recorded_at": null,
+  "license_status": "N/A -- synthetic values, no upstream content",
+  "schema": "LIVE_VERIFIED",
+  "schema_verified_at": "2026-09-30",
+  "schema_source": "docs/PHASE2_PROVIDER_CONTRACT.md (unpaywall)",
+  "schema_unverified": [
+    "prose definition of bronze (unpaywall.org is a JS shell)"
+  ],
+  "endpoint": "https://api.unpaywall.org/v2/{doi}?email=...  [VERIFIED 2026-09-30]",
+  "contains_full_text": false,
+  "credentials_redacted": true,
+  "note": "The important one. Bronze is free to read and carries a resolvable PDF URL, yet no licence -- so permission must stay UNKNOWN, not OA_NO_DOWNLOAD and not MAY_RETRIEVE. The live gold record probed on 2026-09-30 also carried license: null, so this is not a bronze peculiarity."
+}

@@ -1,0 +1,218 @@
+{
+  "_synthetic_values": true,
+  "meta": {
+    "count": 3,
+    "page": 1,
+    "per_page": 25,
+    "cost_usd": 0.0001
+  },
+  "results": [
+    {
+      "id": "https://openalex.org/W0000000001",
+      "doi": "https://doi.org/10.0000/synthetic.2026.0001",
+      "display_name": "Synthesis of 1,4-diphenyl-1,3-diyne by oxidative coupling",
+      "title": "Synthesis of 1,4-diphenyl-1,3-diyne by oxidative coupling",
+      "publication_year": 2021,
+      "publication_date": "2021-04-17",
+      "type": "article",
+      "ids": {
+        "openalex": "https://openalex.org/W0000000001",
+        "doi": "https://doi.org/10.0000/synthetic.2026.0001"
+      },
+      "authorships": [
+        {
+          "author": {
+            "display_name": "A Synthetic",
+            "orcid": null
+          }
+        },
+        {
+          "author": {
+            "display_name": "B Fictional",
+            "orcid": null
+          }
+        }
+      ],
+      "abstract_inverted_index": {
+        "A": [
+          0
+        ],
+        "glucokinase": [
+          1
+        ],
+        "regulator": [
+          2
+        ],
+        "was": [
+          3
+        ],
+        "selected": [
+          4
+        ],
+        "to": [
+          5
+        ],
+        "identify": [
+          6
+        ],
+        "mutations": [
+          7
+        ],
+        "in": [
+          8
+        ],
+        "NIDDK": [
+          9
+        ],
+        "that": [
+          10
+        ]
+      },
+      "open_access": {
+        "is_oa": true,
+        "oa_status": "gold",
+        "oa_url": "https://example.org/landing/1",
+        "any_repository_has_fulltext": true
+      },
+      "best_oa_location": {
+        "id": "doi:10.0000/synthetic.2026.0001",
+        "is_oa": true,
+        "landing_page_url": "https://example.org/landing/1",
+        "pdf_url": "https://example.org/pdf/1",
+        "source": {
+          "id": "https://openalex.org/S0000000001",
+          "display_name": "Journal of Synthetic Chemistry",
+          "issn_l": "0000-0000",
+          "issn": [
+            "0000-0000"
+          ],
+          "is_oa": true,
+          "is_in_doaj": false,
+          "is_core": true
+        },
+        "license": "cc-by",
+        "version": "publishedVersion",
+        "is_accepted": true,
+        "is_published": true,
+        "is_best": true
+      },
+      "has_fulltext": true,
+      "has_content": {
+        "grobid_xml": true,
+        "pdf": true
+      },
+      "content_urls": {
+        "pdf": "https://content.openalex.org/works/W0000000001.pdf",
+        "grobid_xml": "https://content.openalex.org/works/W0000000001.grobid-xml"
+      },
+      "primary_location": {
+        "source": {
+          "display_name": "Journal of Synthetic Chemistry"
+        }
+      },
+      "is_retracted": false
+    },
+    {
+      "id": "https://openalex.org/W0000000002",
+      "doi": null,
+      "display_name": "Sonogashira coupling in diyne synthesis: a review",
+      "title": "Sonogashira coupling in diyne synthesis: a review",
+      "publication_year": 2019,
+      "publication_date": "2019-01-01",
+      "type": "article",
+      "ids": {
+        "openalex": "https://openalex.org/W0000000002"
+      },
+      "authorships": [
+        {
+          "author": {
+            "display_name": "C Placeholder",
+            "orcid": null
+          }
+        }
+      ],
+      "abstract_inverted_index": null,
+      "open_access": {
+        "is_oa": false,
+        "oa_status": "closed",
+        "oa_url": null,
+        "any_repository_has_fulltext": false
+      },
+      "best_oa_location": null,
+      "has_fulltext": false,
+      "has_content": {
+        "grobid_xml": false,
+        "pdf": false
+      },
+      "content_urls": null,
+      "primary_location": {
+        "source": {
+          "display_name": "Reviews in Fake Chemistry"
+        }
+      },
+      "is_retracted": false
+    },
+    {
+      "id": "https://openalex.org/W0000000003",
+      "doi": "https://doi.org/10.0000/synthetic.2022.0003",
+      "display_name": "A diamond open access note on diyne chemistry",
+      "title": "A diamond open access note on diyne chemistry",
+      "publication_year": 2022,
+      "publication_date": "2022-06-01",
+      "type": "article",
+      "ids": {
+        "openalex": "https://openalex.org/W0000000003",
+        "doi": "https://doi.org/10.0000/synthetic.2022.0003"
+      },
+      "authorships": [
+        {
+          "author": {
+            "display_name": "D Diamond",
+            "orcid": null
+          }
+        }
+      ],
+      "abstract_inverted_index": null,
+      "open_access": {
+        "is_oa": true,
+        "oa_status": "diamond",
+        "oa_url": "https://example.org/landing/3",
+        "any_repository_has_fulltext": true
+      },
+      "best_oa_location": {
+        "id": "doi:10.0000/synthetic.2022.0003",
+        "is_oa": true,
+        "landing_page_url": "https://example.org/landing/3",
+        "pdf_url": null,
+        "source": {
+          "id": "https://openalex.org/S0000000003",
+          "display_name": "Diamond Journal of Chemistry",
+          "issn_l": "0000-0001",
+          "issn": [
+            "0000-0001"
+          ],
+          "is_oa": true,
+          "is_in_doaj": true,
+          "is_core": false
+        },
+        "license": null,
+        "version": "publishedVersion",
+        "is_accepted": true,
+        "is_published": true,
+        "is_best": true
+      },
+      "has_fulltext": false,
+      "has_content": {
+        "grobid_xml": false,
+        "pdf": false
+      },
+      "content_urls": null,
+      "primary_location": {
+        "source": {
+          "display_name": "Diamond Journal of Chemistry"
+        }
+      },
+      "is_retracted": false
+    }
+  ]
+}

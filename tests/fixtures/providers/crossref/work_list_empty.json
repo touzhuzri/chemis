@@ -1,0 +1,13 @@
+{
+  "status": "ok",
+  "message-type": "work-list",
+  "message": {
+    "items": [],
+    "total-results": 1,
+    "items-per-page": 0,
+    "next-cursor": "CURSOR-PAGE-3",
+    "query": {
+      "search-queries": []
+    }
+  }
+}

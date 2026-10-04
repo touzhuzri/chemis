@@ -1,0 +1,11 @@
+### CC0 page, first 400 chars:
+ Creative Commons Zero v1.0 Universal | Software Package Data Exchange (SPDX) Linux Foundation Collaborative Projects Software Package Data Exchange (SPDX) Home ? Licenses Creative Commons Zero v1.0 Universal false Full name Creative Commons Zero v1.0 Universal Short identifier CC0-1.0 Other web pages for this license https://creativecommons.org/publicdomain/zero/1.0/legalcode isValid: true, isLiv
+
+  licenseIdentifier occurrences: []
+  [CC0-1.0] ...Zero v1.0 Universal false Full name Creative Commons Zero v1.0 Universal Short identifier CC0-1.0 Other web pages for this license https://creativecommons.org/publicdomain/zero/1.0/legalcode isValid: ...
+
+### CC-BY-4.0 page, first 400 chars:
+ Creative Commons Attribution 4.0 International | Software Package Data Exchange (SPDX) Linux Foundation Collaborative Projects Software Package Data Exchange (SPDX) Home ? Licenses Creative Commons Attribution 4.0 International false Full name Creative Commons Attribution 4.0 International Short identifier CC-BY-4.0 Other web pages for this license https://creativecommons.org/licenses/by/4.0/lega
+
+  licenseIdentifier occurrences: []
+

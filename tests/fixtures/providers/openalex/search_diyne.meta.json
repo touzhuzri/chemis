@@ -1,0 +1,18 @@
+{
+  "provider": "openalex",
+  "fixture": "search_diyne",
+  "values": "SYNTHETIC",
+  "is_recorded_response": false,
+  "recorded_at": null,
+  "license_status": "N/A -- synthetic values, no upstream content",
+  "schema": "LIVE_VERIFIED",
+  "schema_verified_at": "2026-09-30",
+  "schema_source": "docs/PHASE2_PROVIDER_CONTRACT.md (openalex)",
+  "schema_unverified": [
+    "abstract_inverted_index content for a record that actually has an abstract (the live probe returned null for every record sampled)"
+  ],
+  "endpoint": "https://api.openalex.org/works  [VERIFIED 2026-09-30]",
+  "contains_full_text": false,
+  "credentials_redacted": true,
+  "note": "Search results for the Phase 2 end-to-end query. The second record has no DOI, which is what makes the title/year dedup pass load-bearing. The third is a diamond OA record with no licence -- the case that must stay at UNKNOWN permission."
+}

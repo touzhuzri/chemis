@@ -1,0 +1,19 @@
+{
+  "provider": "unpaywall",
+  "fixture": "is_oa_unknown_status",
+  "values": "SYNTHETIC",
+  "is_recorded_response": false,
+  "recorded_at": null,
+  "license_status": "N/A -- synthetic values, no upstream content",
+  "schema": "LIVE_VERIFIED_FOR_SHAPE_ONLY",
+  "schema_verified_at": "2026-09-30",
+  "schema_source": "docs/PHASE2_PROVIDER_CONTRACT.md (unpaywall)",
+  "schema_unverified": [
+    "the value 'platinum' is synthetic; the point is that an unmodelled value must not be mapped onto a modelled one",
+    "the full set of oa_status values Unpaywall can return"
+  ],
+  "endpoint": "https://api.unpaywall.org/v2/{doi}?email=...  [PARTIALLY VERIFIED 2026-09-30]",
+  "contains_full_text": false,
+  "credentials_redacted": true,
+  "note": "A status string outside the modelled set. It must degrade to UNKNOWN and the raw value must survive verbatim -- silently coercing it to gold would hand the record a policy path it never qualified for."
+}

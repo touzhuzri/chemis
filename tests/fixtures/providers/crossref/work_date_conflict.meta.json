@@ -1,0 +1,16 @@
+{
+  "provider": "crossref",
+  "fixture": "work_date_conflict",
+  "values": "SYNTHETIC",
+  "is_recorded_response": false,
+  "recorded_at": null,
+  "license_status": "N/A -- synthetic values, no upstream content",
+  "schema": "LIVE_VERIFIED",
+  "schema_verified_at": "2026-09-30",
+  "schema_source": "docs/PHASE2_PROVIDER_CONTRACT.md (crossref)",
+  "schema_unverified": [],
+  "endpoint": "https://api.crossref.org/v1/works/10.0000/...  [VERIFIED 2026-09-30]",
+  "contains_full_text": false,
+  "credentials_redacted": true,
+  "note": "Three publication dates that disagree. The conflict must be recorded, not averaged into a date nobody published."
+}

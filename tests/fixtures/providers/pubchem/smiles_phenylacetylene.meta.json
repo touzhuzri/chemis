@@ -1,0 +1,15 @@
+{
+  "origin": "LIVE_CAPTURE",
+  "source": "PUBCHEM",
+  "endpoint": "PUG REST",
+  "url": "https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/smiles/property/SMILES,ConnectivitySMILES,InChI,InChIKey,MolecularFormula,MolecularWeight,Title/JSON",
+  "retrieved_at": "2026-10-01T15:40:21+00:00",
+  "license": "U.S. Government work / public domain. PubChem is a resource of the U.S. National Library of Medicine; its records carry no copyright. See https://pubchem.ncbi.nlm.nih.gov/docs/pug-rest#section=License and https://www.ncbi.nlm.nih.gov/home/about/policies/",
+  "description": "structure lookup; body is form-encoded, see the .meta.json",
+  "request_method": "POST",
+  "request_form": {
+    "smiles": "C#Cc1ccccc1"
+  },
+  "listkey_used": null,
+  "tool": "tests/fixtures/providers/_gen_pubchem.py"
+}

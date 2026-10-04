@@ -1,0 +1,28 @@
+{
+  "_synthetic_values": true,
+  "doi": "10.0000/synthetic.2020.0003",
+  "title": "A bronze open access article",
+  "year": 2020,
+  "is_oa": true,
+  "oa_status": "bronze",
+  "best_oa_location": {
+    "endpoint_id": null,
+    "evidence": "deprecated",
+    "host_type": "publisher",
+    "is_best": true,
+    "license": null,
+    "oa_date": "2020-01-01",
+    "pmh_id": null,
+    "repository_institution": null,
+    "updated": "deprecated",
+    "url": "https://example.org/pdf/3",
+    "url_for_landing_page": "https://example.org/landing/3",
+    "url_for_pdf": "https://example.org/pdf/3",
+    "version": "publishedVersion"
+  },
+  "oa_locations": [],
+  "oa_locations_embargoed": [],
+  "has_repository_copy": false,
+  "journal_is_oa": false,
+  "journal_is_in_doaj": false
+}
