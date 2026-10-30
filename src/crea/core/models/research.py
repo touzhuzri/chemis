@@ -199,6 +199,12 @@ class ResearchReport(BaseModel):
     trace_summary: str = ""
     generated_at: str = Field(default_factory=utc_now_iso)
     status: TaskStatus = TaskStatus.PENDING
+    #: Why the run ended the way it did, distinct from the coarse `status`
+    #: (CREA V1.1 fix F): "completed" | "partial" | "input_required" |
+    #: "no_results" | "failed". `status` is a coarse vocabulary shared with
+    #: the API; this is the reason a reader sees first. Additive: an empty
+    #: string means the run predates this field and carries only `status`.
+    outcome: str = ""
 
     def unsupported_findings(self) -> list[Finding]:
         """Findings that assert something no Evidence supports."""

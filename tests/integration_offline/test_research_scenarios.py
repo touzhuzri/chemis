@@ -357,14 +357,17 @@ def test_the_two_scenarios_share_no_state(tmp_path):
 
 def test_scenario_C_no_structure_input_never_guesses_a_structure():
     """question "Analyze phenylacetylene", structure_input=None →
-    Identity unresolved → no guessed structure → PARTIAL.
+    Identity unresolved → no guessed structure → PARTIAL, and **no**
+    literature discovery.
 
     The user handed over a sentence, not a structure. Every path that could
     invent one -- a name guessed into a SMILES, a SMILES guessed into an
     InChI, analysis run on whichever structure looked plausible -- has to
-    stay shut. What may run without a structure (literature discovery) still
-    runs; the run ends PARTIAL because the structure half of the research
-    did not happen, and it says so.
+    stay shut. And (CREA V1.1 fix A/B) discovery is anchored to a chemical
+    object, so with none established the run does not push the question
+    sentence into a provider: it records "input required" and performs no
+    search. The run ends PARTIAL because the research did not happen, and
+    the report says exactly that.
     """
     # The workflow is handed its own stack, sink included: a second sink
     # would render a report disagreeing with what the tools produced.
@@ -402,9 +405,16 @@ def test_scenario_C_no_structure_input_never_guesses_a_structure():
     assert report.reaction_details == []
     assert report.routes == []
 
-    # -- 6. what can run without a structure still ran --------------------
-    # literature discovery does not need a structure; it may continue.
-    assert report.sources, "literature discovery should continue without a structure"
+    # -- 6. discovery is NOT run without a chemical object (V1.1 fix A/B) --
+    # The question sentence is never used as a search term, so no discovery
+    # lands -- and no paper that merely shares words with the question can be
+    # dressed up as a relevant result.
+    assert report.sources == [], (
+        "literature discovery must not run without a resolved chemical object")
+    assert report.outcome == "input_required"
+    lit = [s for s in task.steps if s.tool == "search_literature"]
+    assert lit and lit[0].result_status is None, "search_literature was skipped, not run"
+    assert "identity unresolved" in lit[0].note
 
     # -- 5. the report says all of this in the mandated shape --------------
     markdown = render_research_report(report, identity=resolution)

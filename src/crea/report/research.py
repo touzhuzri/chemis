@@ -628,13 +628,23 @@ def _v2_status(report: ResearchReport,
 
 
 def _stopped_at(session: "ResearchSession | None") -> str:
-    """Where the research stopped, for a report that is not complete."""
+    """Where the research stopped, for a report that is not complete.
+
+    The steps come from the session, or -- when the run was read back from
+    the database and its session-level `steps` were not persisted -- from the
+    task the session carries, which is. And "stopped at" names the last step
+    that actually *ran*: a recorded-but-skipped step is not where a run
+    stopped, and reporting one is how a run that completed literature ended
+    up saying "before any step completed" while the report listed a success.
+    """
     if session is None:
         return "not recorded (no session attached)"
     if not session.status.is_terminal:
         return f"phase {session.status.value}"
-    if session.steps:
-        last = session.steps[-1]
+    steps = list(session.steps) or list(getattr(session.task, "steps", []) or [])
+    ran = [s for s in steps if s.result_status is not None]
+    if ran:
+        last = ran[-1]
         return f"step {last.index} ({last.tool or last.action.value})"
     return "before any step completed"
 
@@ -1071,6 +1081,9 @@ def render_research_report(
     add("# Research Report")
     add("")
     add(f"Status: {_v2_status(report, session)}")
+    outcome = getattr(report, "outcome", "") or ""
+    if outcome and outcome != "completed":
+        add(f"Outcome: {outcome.upper()}")
     if _v2_status(report, session) != "COMPLETED":
         add(f"Stopped at: {_stopped_at(session)}")
     add("")

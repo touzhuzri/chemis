@@ -13,8 +13,10 @@ Two failure rules shape this class:
   the steps that may still legitimately run. Nothing is faked to make the
   flow look complete.
 * An unresolved identity ends the structure-dependent steps (analysis,
-  retrosynthesis, validation). The workflow never guesses a structure to
-  keep the pipeline moving; the report says "identity unresolved" instead.
+  retrosynthesis, validation) AND literature discovery. The workflow never
+  guesses a structure to keep the pipeline moving, and it never uses the
+  whole research question as a search term -- a run with no chemical object
+  reports "input required" instead of a discovery that only looks relevant.
 
 The caller supplies the user's input explicitly (`structure_input`,
 `document_id`); extracting a chemical name from a free-text question is
@@ -24,7 +26,7 @@ guessed structure wearing the user's question as a disguise.
 
 from __future__ import annotations
 
-from crea.core.models.identity import StructureInput, StructureInputKind
+from crea.core.models.identity import StructureInput
 from crea.core.models.literature import Paper
 from crea.core.models.reaction import ReactionRecord
 from crea.core.models.research import (
@@ -150,6 +152,7 @@ class ResearchWorkflow:
         index = 0
         tool_calls = 0
         partial = False
+        failed_steps = 0
 
         def call(tool: str, arguments: dict):
             """Execute one tool, record the step, and flag anything that failed.
@@ -159,7 +162,7 @@ class ResearchWorkflow:
             all three, because the trace, the machine-readable task and the
             rendered report are read by different people.
             """
-            nonlocal index, tool_calls, partial
+            nonlocal index, tool_calls, partial, failed_steps
             index += 1
             tool_calls += 1
             step_id = f"{task.task_id}-w{index:02d}"
@@ -172,6 +175,7 @@ class ResearchWorkflow:
             ))
             if result.status in _FAILED_STATUSES:
                 partial = True
+                failed_steps += 1
                 message = f"{tool} 未成功：{result.error or result.status.value}"
                 task.errors.append(message)
                 unresolved.append(message)
@@ -200,6 +204,7 @@ class ResearchWorkflow:
         # fall back to a plausible one.
         smiles: str | None = None
         entity_id: str | None = None
+        identity_data: dict = {}
         if structure_input is None:
             skip("resolve_chemical_identity", "未提供 structure_input")
             unresolved.append(
@@ -213,6 +218,7 @@ class ResearchWorkflow:
             data = (result.data
                     if result.status is ToolStatus.OK
                     and isinstance(result.data, dict) else {})
+            identity_data = data
             selected = data.get("selected") or {}
             if data.get("chemistry_allowed") and selected.get("canonical_smiles"):
                 smiles = selected["canonical_smiles"]
@@ -272,18 +278,28 @@ class ResearchWorkflow:
         # Papers found here enter the report as sources, never as evidence:
         # discovery is not proof, and metadata cannot be upgraded into
         # experimental support by being listed.
-        literature_query = (
-            structure_input.value
-            if structure_input is not None
-            and structure_input.kind is StructureInputKind.NAME
-            else task.question
-        )
+        #
+        # Discovery is anchored to a chemical object, never to the question
+        # sentence. Without a resolved identity there is no chemical object to
+        # search for, and pushing the whole research question into Crossref /
+        # OpenAlex returns whatever shares its words (foot images, film
+        # reviews, COVID) -- a discovery that only looks relevant. Such a run
+        # records "input required" and performs no discovery at all. With an
+        # identity, the query is the compound the run established (its name,
+        # or the structure the user typed), not the raw question.
         from crea.core.models.knowledge import ResearchPlanAction
 
+        literature_query = _literature_query(structure_input, identity_data)
         search_planned = (plan is None or any(
             step.action is ResearchPlanAction.SEARCH_LITERATURE
             for step in plan.steps))
-        if not search_planned:
+        if smiles is None:
+            skip("search_literature",
+                 "identity unresolved：无确定化学对象，未把整句研究问题当检索词")
+            unresolved.append(
+                "input required：未提供可解析的化学对象（SMILES / InChI / "
+                "可解析名称）；文献检索未执行——不以整句研究问题作为检索词。")
+        elif not search_planned:
             # §39: the base already covers the facets a search would fill, and
             # the user did not ask for the latest -- so the run reuses what it
             # holds instead of re-searching. Recorded, never silent.
@@ -526,7 +542,24 @@ class ResearchWorkflow:
         phase("reporting", WorkflowStatus.REPORTING)
         task.status = TaskStatus.PARTIAL if partial else TaskStatus.COMPLETED
         unresolved = list(dict.fromkeys(unresolved))
-        if executed:
+        # The outcome is the reason, distinct from the coarse status (fix F):
+        # "缺少结构输入" is not "执行到一半失败", and neither is "没有搜索结果".
+        if smiles is None:
+            outcome = "input_required"
+        elif not partial:
+            outcome = "completed"
+        elif executed:
+            outcome = "partial"
+        elif failed_steps:
+            outcome = "failed"
+        else:
+            outcome = "no_results"
+        if outcome == "input_required":
+            interpretation = (
+                "input-required：未提供可解析的化学对象，身份未建立；分子分析、"
+                "文献检索、逆合成与路线验证均未执行（不猜测结构，不以整句"
+                "研究问题作检索词）。")
+        elif executed:
             interpretation = ("ResearchWorkflow 顺序执行研究步骤，成功完成："
                               + "、".join(executed) + "。")
         else:
@@ -550,6 +583,7 @@ class ResearchWorkflow:
             reactions=reactions_built,
             reaction_links=links,
         )
+        report.outcome = outcome
         task.report = report
         task.evidence = list(self._evidence)
         task.sources = sources
@@ -594,7 +628,10 @@ class ResearchWorkflow:
                 routes=list(report.routes),
                 links=list(links),
             )
-            report.knowledge = self._knowledge_report(existing_ids, task, entity_id)
+            report.knowledge = self._knowledge_report(
+                existing_ids, task, entity_id,
+                discovered=[p.paper_id for p in discovered],
+                identity_unresolved=smiles is None)
         return report
 
     # -- knowledge report (Phase 3.12) --------------------------------------
@@ -612,8 +649,49 @@ class ResearchWorkflow:
             "routes": [r.route_id for r in kb.list_routes()],
         }
 
+    def _relevant_ids(self, entity_id: str | None,
+                      discovered: list[str] | None = None) -> set[str]:
+        """The ids tied to *this run's* chemical object.
+
+        The scope of "existing knowledge" (fix C): only objects the run's
+        entity is actually connected to -- the entity, its reactions, the
+        records/mentions/evidence/paper sources behind them, and the papers
+        this run's own search rediscovered. The global knowledge base is
+        never dumped into a report.
+        """
+        kb = self._knowledge_base
+        if kb is None or not entity_id:
+            return set()
+        from crea.services.research_intelligence import assess_coverage
+
+        ids: set[str] = {entity_id}
+        ids.update(discovered or [])
+        try:
+            coverage = assess_coverage(kb, entity_id=entity_id)
+            for facet in coverage.facets:
+                ids.update(facet.object_ids)
+        except Exception:  # noqa: BLE001 - relevance is best-effort
+            pass
+        try:
+            for reaction in kb.search_reactions(entity_id=entity_id):
+                ids.add(reaction.reaction_id)
+                for record in kb.get_reaction_records(reaction.reaction_id):
+                    ids.add(record.reaction_id)
+                for item in kb.get_evidence_for_reaction(reaction.reaction_id):
+                    ids.add(item.evidence_id)
+                for component in reaction.components():
+                    if component.entity_id:
+                        ids.add(component.entity_id)
+                    if component.mention is not None:
+                        ids.add(component.mention.mention_id)
+        except Exception:  # noqa: BLE001 - relevance is best-effort
+            pass
+        return ids
+
     def _knowledge_report(self, existing_ids: dict, task,
-                          entity_id: str | None) -> object:
+                          entity_id: str | None,
+                          discovered: list[str] | None = None,
+                          identity_unresolved: bool = False) -> object:
         """What the base knew and what this run changed (§100)."""
         from crea.core.models.knowledge import KnowledgeReport
         from crea.services.research_intelligence import (
@@ -625,18 +703,35 @@ class ResearchWorkflow:
         after = self._snapshot()
         new = {kind: [i for i in ids if i not in set(existing_ids.get(kind, []))]
                for kind, ids in after.items()}
-        existing = {kind: list(existing_ids.get(kind, [])) for kind in after}
+        # Existing knowledge is scoped to this run's chemical object (fix C):
+        # never the whole database. A run with no resolved identity has no
+        # scope, so it has no "existing" knowledge to show -- and must not
+        # leak the global base in the gap (a report is about one question).
+        relevant = self._relevant_ids(entity_id, discovered)
+        existing = {kind: [i for i in existing_ids.get(kind, [])
+                           if i in relevant]
+                    for kind in after}
+
+        # coverage/gaps and conflicts are computed independently: a failure in
+        # the conflict synthesis must never blank the gaps (fix D -- that
+        # swallowing is exactly how "identity unresolved" showed as "no gaps").
         try:
             coverage = assess_coverage(self._knowledge_base, entity_id=entity_id,
                                        target=task.question)
             gaps = find_gaps(coverage)
+        except Exception:  # noqa: BLE001 - knowledge report is best-effort
+            coverage, gaps = None, []
+        try:
             # conflicts live on the recorded conditions of every reaction this
             # entity takes part in -- across runs, so a second run's different
             # temperature is a CONFLICT, kept with both citations (§22-§24)
-            conflicts = synthesize_fields(
+            conflicts = (synthesize_fields(
                 self._knowledge_base, entity_id=entity_id).conflicts
-        except Exception:  # noqa: BLE001 - knowledge report is best-effort
-            coverage, gaps, conflicts = None, [], []
+                if entity_id else [])
+        except Exception:  # noqa: BLE001 - conflicts are best-effort
+            conflicts = []
+        if identity_unresolved:
+            gaps = _input_required_gaps(gaps)
         return KnowledgeReport(
             coverage=coverage, gaps=gaps, conflicts=conflicts,
             existing=existing, new=new)
@@ -682,6 +777,50 @@ class ResearchWorkflow:
         if parsed is None:
             return ""
         return "\n".join(page.text for page in parsed.pages if page.text)
+
+
+def _literature_query(structure_input: StructureInput | None,
+                      identity_data: dict) -> str:
+    """The literature query: the chemical object, never the question sentence.
+
+    A resolved identity names a compound; that name (falling back to the
+    structure the user typed) is the search anchor. The free-text research
+    question is deliberately not used: a whole sentence is not a chemical
+    object, and a provider answers whatever it half-matches.
+    """
+    selected = (identity_data or {}).get("selected") or {}
+    for key in ("candidate_name", "input_name"):
+        value = (selected.get(key) or "").strip()
+        if value:
+            return value
+    if structure_input is not None:
+        return structure_input.value.strip()
+    return (selected.get("canonical_smiles") or "").strip()
+
+
+def _input_required_gaps(gaps: list) -> list:
+    """Make the identity gap explicit when no chemical object was established.
+
+    `find_gaps` states the generic "no ChemicalEntity" gap. With no structure
+    input at all the honest sentence is sharper: the run is blocked on input,
+    and nothing downstream of identity could run (fix D/F).
+    """
+    from crea.core.models.knowledge import KnowledgeFacet
+
+    out: list = []
+    replaced = False
+    for gap in gaps:
+        if gap.facet is KnowledgeFacet.ENTITY and not replaced:
+            replaced = True
+            out.append(gap.model_copy(update={
+                "reason": ("缺少结构输入：identity 未解析（无 SMILES / InChI / "
+                           "可解析名称），分子分析、文献检索、反应与路线步骤"
+                           "均未建立。"),
+                "suggested_action": "provide a structure input (SMILES / InChI / name)",
+            }))
+        else:
+            out.append(gap)
+    return out
 
 
 __all__ = ["ResearchWorkflow"]

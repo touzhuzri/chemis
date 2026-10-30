@@ -43,6 +43,18 @@ _REQUIRED_INPUTS = {
     TaskType.AGENT_ANALYSIS: ("question",),
 }
 
+#: Inputs that must parse as a structure before the task may run (fix A/#3).
+#: A chemical *name* ("苯乙炔") is not a structure: this layer does not resolve
+#: names, and a task that silently searched with a name would be a fabricated
+#: reaction result. An input that does not parse is `BLOCKED`, never `FAILED`
+#: -- we cannot run it, which is not the same as the tool erroring.
+_STRUCTURE_INPUTS = {
+    TaskType.MOLECULE_INSPECTION: ("smiles",),
+    TaskType.TRANSFORMATION_SEARCH: ("substrate", "target"),
+    TaskType.ROUTE_EXPLORATION: ("start", "target"),
+    TaskType.ROUTE_REASONING: ("start", "target"),
+}
+
 
 @dataclass
 class TaskOutcome:
@@ -96,6 +108,10 @@ class ResearchTaskExecutor:
         if missing:
             return TaskOutcome(
                 status="blocked", error="TASK_INPUT_NOT_FOUND: " + ", ".join(missing))
+        invalid = self._invalid_structures(task)
+        if invalid:
+            return TaskOutcome(
+                status="blocked", error="TASK_INPUT_INVALID: " + "; ".join(invalid))
         dangling = self._dangling_refs(task)
         if dangling:
             return TaskOutcome(
@@ -112,6 +128,28 @@ class ResearchTaskExecutor:
     def _missing_inputs(task) -> list[str]:
         required = _REQUIRED_INPUTS.get(task.task_type, ())
         return [k for k in required if not task.input_refs.get(k)]
+
+    @staticmethod
+    def _invalid_structures(task) -> list[str]:
+        """Chemical inputs that are not structures (fix A/#3): block, don't guess.
+
+        A non-empty structure input must parse. A name this layer cannot
+        resolve is refused here rather than handed to a SMILES engine -- which
+        would either error misleadingly or match the wrong thing.
+        """
+        problems: list[str] = []
+        for key in _STRUCTURE_INPUTS.get(task.task_type, ()):
+            value = task.input_refs.get(key)
+            if value is None or not str(value).strip():
+                continue  # required-ness handled above; empty optional is fine
+            try:
+                from crea.chem.normalize import normalize
+
+                normalize(str(value))
+            except Exception:  # noqa: BLE001 - an unparsable structure is a result
+                problems.append(
+                    f"{key} 不是有效的结构表示（需要 SMILES/InChI）：{value!r}")
+        return problems
 
     def _dangling_refs(self, task) -> list[str]:
         """Any existing-object id in the inputs must resolve (§六十)."""
