@@ -426,7 +426,9 @@ class Planner:
                 step.fallback_tool = fallback
         return adopted, warnings
 
-    def _validate(self, plan: ResearchPlan, max_steps: int) -> list[str]:
+    def _validate(self, plan: ResearchPlan, max_steps: int,
+                  existing_ids: set[str] | frozenset[str] = frozenset()
+                  ) -> list[str]:
         issues: list[str] = []
         if not plan.steps:
             issues.append("a plan needs at least one step")
@@ -442,6 +444,7 @@ class Planner:
             issues.append(f"duplicate step ids: {', '.join(sorted(duplicates))}")
 
         known = {step.step_id for step in plan.steps if step.step_id}
+        known |= set(existing_ids)
         for step in plan.steps:
             label = step.step_id or "<unnamed>"
             if step.tool:
@@ -502,8 +505,9 @@ class Planner:
 
     # -- model-assisted planning -------------------------------------------
 
-    def _plan_from_payload(self, payload: dict,
-                           goal: str) -> tuple[ResearchPlan, list[str], list[str]]:
+    def _plan_from_payload(self, payload: dict, goal: str,
+                           existing_ids: set[str] | frozenset[str] = frozenset()
+                           ) -> tuple[ResearchPlan, list[str], list[str]]:
         issues: list[str] = []
         warnings: list[str] = []
         raw_steps = payload.get("steps")
@@ -574,7 +578,7 @@ class Planner:
             ))
 
         plan = ResearchPlan(goal=goal, steps=steps)
-        issues.extend(self._validate(plan, self.max_steps))
+        issues.extend(self._validate(plan, self.max_steps, existing_ids))
         return plan, issues, warnings
 
     def _planning_prompt(self, goal: str) -> str:
@@ -660,13 +664,8 @@ class Planner:
 
         if kind is ObservationKind.NEEDS_INPUT:
             decision = self._needs_input(session, step, observation)
-            if (decision.kind is PlanDecisionKind.BLOCKED
-                    and allow_model_revision):
-                revised = self._model_revision(session, step, observation)
-                if revised:
-                    return self._next(session, trigger=observation,
-                                      changes=revised)
-            return decision
+            return self._revision_or(decision, session, step, observation,
+                                     allow_model_revision)
 
         if kind is ObservationKind.NO_RESULT:
             decision = self._use_fallback(
@@ -699,9 +698,11 @@ class Planner:
                 f"{step.step_id} 的工具/数据源不可用；按计划尝试替代数据源")
             if decision is not None:
                 return decision
-            return self._next(
+            decision = self._next(
                 session, trigger=observation,
                 context="工具或数据源不可用（UNAVAILABLE，不是没有结果）")
+            return self._revision_or(decision, session, step, observation,
+                                     allow_model_revision)
 
         if kind is ObservationKind.ERROR:
             decision = self._use_fallback(
@@ -709,9 +710,11 @@ class Planner:
                 f"{step.step_id} 执行出错；不重试，改用计划声明的安全替代")
             if decision is not None:
                 return decision
-            return self._next(
+            decision = self._next(
                 session, trigger=observation,
                 context="工具执行失败（ERROR，不是没有结果）")
+            return self._revision_or(decision, session, step, observation,
+                                     allow_model_revision)
 
         return self._finish(session, PlanDecisionKind.BLOCKED,
                             f"unhandled observation kind {kind.value}",
@@ -1196,6 +1199,19 @@ class Planner:
 
     # -- model revision -----------------------------------------------------
 
+    def _revision_or(self, decision: PlanDecision, session: PlanSession,
+                     step: ResearchPlanStep, observation: Observation,
+                     allowed: bool) -> PlanDecision:
+        """Escalate a BLOCKED decision to one constrained model revision."""
+        if not allowed or decision.kind is not PlanDecisionKind.BLOCKED:
+            return decision
+        changes = self._model_revision(session, step, observation)
+        if not changes:
+            return decision
+        revised = self._next(session, trigger=observation)
+        revised.changes = changes + revised.changes
+        return revised
+
     def _model_revision(self, session: PlanSession,
                         step: ResearchPlanStep,
                         observation: Observation) -> list[PlanChange]:
@@ -1218,17 +1234,34 @@ class Planner:
         payload = parse_json_object(response.text or "", required_key="steps")
         if payload is None:
             return []
-        proposed, issues, _ = self._plan_from_payload(payload, session.plan.goal)
+        proposed, issues, _ = self._plan_from_payload(
+            payload, session.plan.goal,
+            {s.step_id for s in session.plan.steps})
         if issues:
             return []
+        # Rename collisions first, so dependencies between the revised steps
+        # stay intact.
+        reserved = {s.step_id for s in session.plan.steps}
+        renamed: dict[str, str] = {}
+        for candidate in proposed.steps:
+            if candidate.step_id in reserved:
+                base = candidate.step_id
+                index = 2
+                while f"{base}-{index}" in reserved:
+                    index += 1
+                renamed[base] = f"{base}-{index}"
+                candidate.step_id = renamed[base]
+            reserved.add(candidate.step_id)
+        for candidate in proposed.steps:
+            candidate.depends_on = [renamed.get(d, d)
+                                    for d in candidate.depends_on]
+
         changes: list[PlanChange] = []
         for candidate in proposed.steps:
             if len(session.plan.steps) >= self.max_steps:
                 break
             if session.revisions >= self.max_revisions:
                 break
-            if candidate.step_id in {s.step_id for s in session.plan.steps}:
-                candidate.step_id = self._unique_id(session, candidate.step_id)
             try:
                 changes.append(self._add_step(
                     session, candidate,

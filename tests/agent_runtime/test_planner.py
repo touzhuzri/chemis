@@ -539,6 +539,34 @@ def test_the_planner_trusts_the_observer_kind_instead_of_reclassifying():
     assert decision.kind is PlanDecisionKind.CONTINUE
 
 
+def test_a_model_revision_is_optional_validated_and_recorded(registry):
+    payload = _model_plan(
+        {"step_id": "recover", "action": "analyze_structure",
+         "tool": "analyze_molecule", "arguments": {"smiles": "CCO"},
+         "reason": "compute the structure instead"})
+    llm = TextScriptedLLMProvider([payload])
+    planner = Planner(registry, llm)
+    session = PlanSession(plan=_plan(
+        _step("s", "search_reactions", ResearchPlanAction.SEARCH_LITERATURE,
+              {"reactant_entity_id": "CHEM-1"})))
+
+    # Without permission, the blocked outcome stays blocked and no model is
+    # consulted.
+    blocked = planner.decide(
+        session, "s", _obs(ObservationKind.ERROR, "search_reactions"))
+    assert blocked.kind is PlanDecisionKind.BLOCKED
+    assert llm.calls == []
+
+    revised = planner.decide(
+        session, "s", _obs(ObservationKind.ERROR, "search_reactions"),
+        allow_model_revision=True)
+    assert revised.kind is PlanDecisionKind.CONTINUE
+    assert revised.next_step_id == "recover"
+    assert [c.kind for c in revised.changes] == [PlanChangeKind.ADD_STEP]
+    assert len(llm.calls) == 1
+    assert planner.validate_plan(session.plan) == []
+
+
 def test_an_ordinary_decision_costs_no_model_call(registry):
     llm = FakeLLMProvider([])
     planner = Planner(registry, llm)
