@@ -108,10 +108,15 @@ class PlanDecisionKind(str, Enum):
 
 
 class PlanChangeKind(str, Enum):
+    """The edits the planner actually makes.
+
+    A fallback or a model revision is an added step; completing arguments is
+    an argument update. Nothing is retargeted or dropped silently -- a step
+    that cannot run stays in the plan and its outcome is why the run stopped.
+    """
+
     ADD_STEP = "add_step"
-    RETARGET_TOOL = "retarget_tool"
     UPDATE_ARGUMENTS = "update_arguments"
-    DROP_STEP = "drop_step"
 
 
 class PlanChange(BaseModel):
@@ -187,14 +192,6 @@ class PlanSession(BaseModel):
 
     def done(self, step_id: str) -> bool:
         return step_id in self.outcomes
-
-
-class PlanValidationError(ValueError):
-    """A plan that cannot be executed as written."""
-
-    def __init__(self, issues: list[str]) -> None:
-        self.issues = list(issues)
-        super().__init__("; ".join(self.issues) or "invalid plan")
 
 
 class _BudgetExceeded(Exception):
@@ -1451,6 +1448,5 @@ __all__ = [
     "PlanDecisionKind",
     "PlanProposal",
     "PlanSession",
-    "PlanValidationError",
     "Planner",
 ]
