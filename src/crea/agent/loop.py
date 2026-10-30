@@ -70,6 +70,11 @@ _PHASE_FOR_TOOL = {
     "route_evidence_report": WorkflowStatus.VALIDATING,
 }
 
+from crea.agent.observer import (
+    Observation,
+    ObservationKind,
+    observe_from_registry,
+)
 from crea.agent.prompt import SYSTEM
 
 
@@ -227,16 +232,21 @@ class ResearchAgent:
                                                step_id=step_id)
                 if result.status is ToolStatus.OK:
                     self._cache[_call_key(action.tool, action.arguments)] = result
+            observation = observe_from_registry(
+                self._registry, result.tool, result)
             step.result_status = result.status
             step.error = result.error
             task.steps.append(step)
-            self._absorb(result)
+            self._absorb(result, observation)
             self._note_phase(result.tool)
             evidence_by_tool.setdefault(result.tool, []).extend(result.evidence_ids)
+            # The model is told what actually happened, not just the payload:
+            # a rejected or unavailable call must not look like an empty answer.
             messages.append({
                 "role": "user",
                 "content": f"tool_result({result.tool}) = "
-                           + json.dumps(redact(result.data), ensure_ascii=False),
+                           + json.dumps(redact(observation.to_context()),
+                                        ensure_ascii=False),
             })
         else:
             task.status = TaskStatus.PARTIAL
@@ -421,8 +431,18 @@ class ResearchAgent:
         except Exception:  # noqa: BLE001
             return None
 
-    def _absorb(self, result: ToolResult) -> None:
-        """Only a real result contributes. A model's account contributes nothing."""
+    def _absorb(self, result: ToolResult,
+                observation: Observation | None = None) -> None:
+        """Only a real result contributes. A model's account contributes nothing.
+
+        M1.2: the observation decides what the *call* was, and every kind other
+        than SUCCESS is recorded. Previously a `REJECTED` result was silently
+        dropped -- the model got `data = null` and no reason, which reads as an
+        empty answer rather than "this never ran".
+        """
+        if observation is None:
+            observation = observe_from_registry(
+                self._registry, result.tool, result)
         if result.status is ToolStatus.OK and isinstance(result.data, dict):
             for item in result.data.get("evidence_ids", []) or []:
                 for evidence in self._evidence:
@@ -434,9 +454,31 @@ class ResearchAgent:
             self._collect_reactions(result)
             self._collect_routes(result)
             self._collect_route_evidence(result)
-        elif result.status in (ToolStatus.ERROR, ToolStatus.UNAVAILABLE):
+        self._record_observation(observation)
+
+    def _record_observation(self, observation: Observation) -> None:
+        """Carry a non-success reading into the run's unresolved record.
+
+        NO_RESULT is recorded too, but as an honourable miss: "queried, nothing
+        matched" is not a failure and must not be described as one.
+        """
+        note = observation.summary or observation.error or ""
+        tool = observation.tool
+        if observation.kind is ObservationKind.NEEDS_INPUT:
+            missing = (f"（缺少：{', '.join(observation.missing_requirements)}）"
+                       if observation.missing_requirements else "")
             self._unresolved.append(
-                f"工具 {result.tool} 未成功：{result.error or result.status.value}")
+                f"工具 {tool} 需要补充信息后才能继续{missing}：{note}")
+        elif observation.kind is ObservationKind.UNAVAILABLE:
+            self._unresolved.append(f"工具 {tool} 当前不可用：{note}")
+        elif observation.kind is ObservationKind.PARTIAL:
+            self._unresolved.append(f"工具 {tool} 只返回了部分结果：{note}")
+        elif observation.kind is ObservationKind.ERROR:
+            self._unresolved.append(f"工具 {tool} 未成功：{note}")
+        elif observation.kind is ObservationKind.NO_RESULT:
+            item = f"工具 {tool} 查询完成，但未找到符合条件的结果"
+            if item not in self._unresolved:
+                self._unresolved.append(item)
 
     def _collect_observations(self, result: ToolResult) -> None:
         """Computed facts come from the tool that computed them.

@@ -64,8 +64,11 @@ class Approval(str, Enum):
 
 
 class PolicyError(str, Enum):
-    """Normalized policy rejection codes. M1.2 will fold these into the
-    observer vocabulary; until then they travel as `error_type` + diagnostics."""
+    """Normalized policy rejection codes.
+
+    They travel on `ToolResult.error_type` and in the diagnostics; the
+    observer (`crea.agent.observer`) reads them as `NEEDS_INPUT`, so there is
+    exactly one status vocabulary and no duplicate enum here."""
 
     APPROVAL_REQUIRED = "APPROVAL_REQUIRED"
     NETWORK_NOT_ALLOWED = "NETWORK_NOT_ALLOWED"

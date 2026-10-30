@@ -44,6 +44,11 @@ from __future__ import annotations
 import json
 from typing import Any, Protocol, runtime_checkable
 
+from crea.agent.observer import (
+    Observation,
+    ObservationKind,
+    observe_from_registry,
+)
 from crea.agent.prompt import CHEMISTRY_SYSTEM
 from crea.core.models.research import (
     ActionKind,
@@ -152,8 +157,11 @@ class ChemistryAgent:
                 result = self._registry.invoke(
                     action.tool or "", action.arguments or {})
                 tool_calls.append(result)
-                self._absorb(result, evidence, provenance, diagnostics)
-                messages.append(self._tool_result_message(result))
+                observation = observe_from_registry(
+                    self._registry, result.tool, result)
+                self._absorb(result, evidence, provenance, diagnostics,
+                             observation)
+                messages.append(self._tool_result_message(observation))
                 continue
 
             diagnostics.append(f"unrecognized action kind: {action.action}")
@@ -192,17 +200,20 @@ class ChemistryAgent:
         return head + messages
 
     @staticmethod
-    def _tool_result_message(result: ToolResult) -> dict:
-        """One tool result as a neutral thread message.
+    def _tool_result_message(observation: Observation) -> dict:
+        """One tool call as a neutral thread message.
 
         The `tool_result(name) = ...` prefix is the established convention
         (see `crea.llm.openai_compatible.to_openai_messages`), so the neutral
         thread translates cleanly to a provider's native tool-message shape.
+        The observation carries the raw status, the reading of it, the reason
+        and the untouched payload -- a rejected call no longer looks like an
+        empty result.
         """
-        payload = redact(result.model_dump(mode="json"))
+        payload = redact(observation.to_context())
         return {
             "role": "user",
-            "content": (f"tool_result({result.tool}) = "
+            "content": (f"tool_result({observation.tool}) = "
                         + json.dumps(payload, ensure_ascii=False)),
         }
 
@@ -229,7 +240,7 @@ class ChemistryAgent:
 
     @staticmethod
     def _absorb(result: ToolResult, evidence: list, provenance: list,
-                diagnostics: list) -> None:
+                diagnostics: list, observation: Observation | None = None) -> None:
         """Lift what a tool actually returned into the aggregates (§11).
 
         Uncertainty is kept distinct on purpose:
@@ -238,6 +249,8 @@ class ChemistryAgent:
         * the tool's own `diagnostics` are forwarded (an empty `search_reactions`
           result carries "no known reaction matches" -- an honest miss, which
           is a different fact from an outage).
+        * M1.2 adds the observation, so a needs-input call states what is
+          missing and a no-result call is labelled as an honest miss.
         """
         if result.provenance:
             provenance.append({"tool": result.tool, **(result.provenance or {})})
@@ -252,6 +265,22 @@ class ChemistryAgent:
             diagnostics.append(
                 f"{result.tool}: rejected ({result.error or result.error_type})")
         diagnostics.extend(result.diagnostics or [])
+
+        if observation is not None:
+            requirement = (
+                f"; needs {', '.join(observation.missing_requirements)}"
+                if observation.missing_requirements else "")
+            if observation.kind is ObservationKind.NEEDS_INPUT:
+                diagnostics.append(
+                    f"{result.tool}: needs input ({observation.error_code or ''}"
+                    f"{requirement}) -- {observation.summary}")
+            elif observation.kind is ObservationKind.NO_RESULT:
+                diagnostics.append(
+                    f"{result.tool}: no matching results "
+                    f"(the query ran; this is not an outage)")
+            elif observation.kind is ObservationKind.PARTIAL:
+                diagnostics.append(
+                    f"{result.tool}: partial result ({observation.summary})")
 
         for evidence_id in result.evidence_ids:
             entry = {"evidence_id": evidence_id, "tool": result.tool}

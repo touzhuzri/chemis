@@ -13,6 +13,7 @@ from crea.agent.chemistry_agent import (
 )
 from crea.agent.live import build_live_stack
 from crea.agent.loop import MAX_STEPS, MAX_TOOL_CALLS, ResearchAgent
+from crea.agent.observer import Observation, ObservationKind, observe
 from crea.agent.prompt import SYSTEM
 from crea.agent.tools import ToolRegistry, ToolSpec
 from crea.agent.tool_surface import build_agent_tools
@@ -21,7 +22,7 @@ from crea.agent.workspace import DocumentLibrary
 
 __all__ = [
     "ChemistryAgent", "DocumentLibrary", "MAX_ITERATIONS", "MAX_STEPS",
-    "MAX_TOOL_CALLS", "ResearchAgent", "SYSTEM", "ToolRegistry",
-    "ToolRegistryLike", "ToolSpec", "build_agent_tools", "build_live_stack",
-    "build_registry",
+    "MAX_TOOL_CALLS", "Observation", "ObservationKind", "ResearchAgent",
+    "SYSTEM", "ToolRegistry", "ToolRegistryLike", "ToolSpec",
+    "build_agent_tools", "build_live_stack", "build_registry", "observe",
 ]

@@ -20,6 +20,7 @@ import json
 import time
 
 from crea.agent.evidence_prompt import SYSTEM
+from crea.agent.observer import observe_from_registry
 from crea.agent.tools import ToolRegistry
 from crea.core.ids import content_hash
 from crea.core.models.agent_run import (
@@ -161,10 +162,13 @@ class EvidenceAgent:
             tool_name=tool, arguments=redact(arguments), status=status,
             output_summary=summary,
             output_ids=sorted({i for ids in output_ids.values() for i in ids}))
-        observation = json.dumps(
-            {"tool": tool, "status": status, "error": result.error,
-             "data": _bounded(result.data)},
-            ensure_ascii=False)[:MAX_TOOL_RESULT_CHARS]
+        # The observation is what the model reads: kind, needs-input reasons
+        # and diagnostics travel with the payload, so a rejected call is not
+        # mistaken for a search that came back empty.
+        observed = observe_from_registry(self._registry, tool, result)
+        payload = observed.to_context()
+        payload["data"] = _bounded(payload.get("data"))
+        observation = json.dumps(payload, ensure_ascii=False)[:MAX_TOOL_RESULT_CHARS]
         return record, f"tool_result({tool}) = {observation}"
 
     # -- grounding (§二十九) ------------------------------------------------
