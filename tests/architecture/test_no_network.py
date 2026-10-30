@@ -323,6 +323,12 @@ AGENT_MODULES = [
     "agent/workspace.py", "agent/offline.py", "agent/demo_pdf.py",
     "agent/prompt.py", "core/models/research.py",
     "llm/base.py", "llm/fake.py", "report/research.py",
+    # M2.0: the AI Research Intelligence reads a model's reply and turns it
+    # into a decision. It is exactly the module this guard exists for.
+    "agent/intelligence.py", "agent/intelligence_prompt.py",
+    "agent/intelligence_runtime.py",
+    "core/models/research_decision.py",
+    "app/research_intelligence.py", "report/intelligence.py",
 ]
 
 #: The one module allowed to hold an HTTP client for a model endpoint.

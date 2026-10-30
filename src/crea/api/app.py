@@ -31,6 +31,7 @@ from crea.api.errors import (
     molecule_not_found,
     not_found,
 )
+from crea.core.errors import ResearchStudyError
 
 
 def create_app(*, context: WorkbenchContext | None = None, db_path=None,
@@ -377,6 +378,77 @@ def create_app(*, context: WorkbenchContext | None = None, db_path=None,
         except ResearchWorkflowError as exc:
             raise _workflow_error(exc) from exc
         return task.model_dump(mode="json")
+
+    # -- AI research intelligence (M2.0) -------------------------------------
+    # The formal AI-driven research entry. Registered *before* the
+    # `/api/research/{job_id}` routes so `/api/research/intelligence` is
+    # read as this path and not as a job id.
+
+    @app.post("/api/research/intelligence")
+    def start_ai_research(payload: dict) -> dict:
+        """Research one natural-language goal with the model deciding.
+
+        Runs synchronously and returns the whole run: the decisions the
+        model made, the tools it chose, what they returned, its
+        interpretations, and why it stopped. When it paused on a question,
+        `awaiting` carries the question and `session_id` can be used to
+        answer it.
+        """
+        body = payload or {}
+        goal = str(body.get("goal") or "").strip()
+        if not goal:
+            raise invalid_request("研究目标不能为空", "goal")
+        try:
+            return ctx.research_intelligence.start(
+                goal,
+                study_id=str(body.get("study_id") or ""),
+                approvals=[str(a) for a in (body.get("approvals") or [])],
+                document_ids=[str(d) for d in (body.get("document_ids") or [])],
+            )
+        except ResearchStudyError as exc:
+            raise _intelligence_error(exc) from exc
+
+    @app.get("/api/research/intelligence/{session_id}")
+    def get_ai_research(session_id: str) -> dict:
+        try:
+            return ctx.research_intelligence.get(session_id)
+        except ResearchStudyError as exc:
+            raise _intelligence_error(exc) from exc
+
+    @app.get("/api/research/intelligence/{session_id}/decisions")
+    def ai_research_decisions(session_id: str) -> dict:
+        """Every turn, accepted or rejected -- the audit trail."""
+        try:
+            return {"decisions": ctx.research_intelligence.decisions(session_id)}
+        except ResearchStudyError as exc:
+            raise _intelligence_error(exc) from exc
+
+    @app.get("/api/research/intelligence/{session_id}/report")
+    def ai_research_report(session_id: str) -> dict:
+        try:
+            return {"report": ctx.research_intelligence.report(session_id)}
+        except ResearchStudyError as exc:
+            raise _intelligence_error(exc) from exc
+
+    @app.post("/api/research/intelligence/{session_id}/answer")
+    def answer_ai_research(session_id: str, payload: dict) -> dict:
+        """Continue a paused run with the person's answers."""
+        body = payload or {}
+        try:
+            return ctx.research_intelligence.answer(
+                session_id,
+                answers=dict(body.get("answers") or {}),
+                approvals=[str(a) for a in (body.get("approvals") or [])])
+        except ResearchStudyError as exc:
+            raise _intelligence_error(exc) from exc
+
+    @app.post("/api/research/intelligence/{session_id}/cancel")
+    def cancel_ai_research(session_id: str) -> dict:
+        """Ask the run to stop before its next decision (cooperative)."""
+        try:
+            return ctx.research_intelligence.cancel(session_id)
+        except ResearchStudyError as exc:
+            raise _intelligence_error(exc) from exc
 
     # -- research jobs -------------------------------------------------------
 
@@ -1102,6 +1174,23 @@ def _workflow_error(exc) -> ApiError:
         return ApiError(exc.code, exc.message, status_code=409)
     if exc.code == "WORKFLOW_LIMIT_REACHED":
         return ApiError(exc.code, exc.message, status_code=422)
+    return invalid_request(exc.message, exc.code)
+
+
+def _intelligence_error(exc) -> ApiError:
+    """Map a `ResearchStudyError` raised by the AI research entry.
+
+    `SESSION_NOT_FOUND` and `NOT_AWAITING_INPUT` are client mistakes about
+    a specific run; `STACK_NOT_CONFIGURED` and an unusable provider are
+    the server's problem and are reported as such rather than as a bad
+    request.
+    """
+    if exc.code in ("SESSION_NOT_FOUND", "REFERENCE_NOT_FOUND"):
+        return ApiError(exc.code, exc.message, status_code=404)
+    if exc.code == "NOT_AWAITING_INPUT":
+        return ApiError(exc.code, exc.message, status_code=409)
+    if exc.code in ("STACK_NOT_CONFIGURED",):
+        return ApiError(exc.code, exc.message, status_code=503)
     return invalid_request(exc.message, exc.code)
 
 

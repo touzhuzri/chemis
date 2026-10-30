@@ -32,6 +32,7 @@ from crea.app.reaction_comparison import ReactionComparisonApplication
 from crea.app.reaction_evidence import ReactionEvidenceApplication
 from crea.app.reaction_graph import ReactionGraphApplication
 from crea.app.research import ResearchApplication
+from crea.app.research_intelligence import ResearchIntelligenceApplication
 from crea.app.research_report import ResearchReportApplication
 from crea.app.research_study import ResearchStudyApplication
 from crea.app.task_workflow import TaskWorkflowApplication
@@ -100,6 +101,36 @@ def make_stack_factory(*, db_path: Path, documents_dir: Path,
     return factory
 
 
+def make_intelligence_stack_factory(*, db_path: Path, offline: bool = False):
+    """The M2.0 AI-research stack composer.
+
+    Same discipline as `make_stack_factory`: the job is to choose which
+    composition root builds the enforcing tool registry -- offline
+    fixtures or live providers -- and to ingest whatever documents the
+    caller actually supplied. No chemistry and no transport is assembled
+    here.
+    """
+
+    def factory(document_ids: list[str] | None = None):
+        from crea.services.knowledge_base import KnowledgeBase
+
+        knowledge_base = KnowledgeBase(db_path)
+        knowledge_base.initialize()
+        if offline:
+            from crea.agent.offline import build_offline_intelligence_stack
+
+            registry, library, sink = build_offline_intelligence_stack(
+                knowledge_base=knowledge_base)
+        else:
+            from crea.agent.live import build_live_intelligence_stack
+
+            registry, library, sink = build_live_intelligence_stack(
+                knowledge_base=knowledge_base)
+        return registry, library, sink
+
+    return factory
+
+
 @dataclass
 class WorkbenchContext:
     """Everything the HTTP layer needs, assembled once at startup."""
@@ -127,6 +158,10 @@ class WorkbenchContext:
     task_workflow: TaskWorkflowApplication
     research_report: ResearchReportApplication
     final_audit: FinalAuditApplication
+    #: M2.0 -- the AI Research Intelligence entry. Its LLM and tool-registry
+    #: factories are built here, in the composition root, never in the app
+    #: or the HTTP layer.
+    research_intelligence: ResearchIntelligenceApplication | None = None
     offline: bool = False
 
     def close(self) -> None:
@@ -268,6 +303,14 @@ def create_context(*, db_path=None, documents_dir=None, offline: bool = False,
         db, _literature_provider_factory(offline),
         access_provider_factory=_unpaywall_provider_factory(offline),
         retry_policy=RetryPolicy(max_retries=2))
+    intelligence = ResearchIntelligenceApplication(
+        db_path=db,
+        # Offline means this process makes no network call: no provider is
+        # built at all, and a run reports MODEL_UNAVAILABLE rather than
+        # quietly reaching out behind the flag.
+        llm_factory=(None if offline else _ai_llm_factory(False)),
+        stack_factory=make_intelligence_stack_factory(db_path=db,
+                                                      offline=offline))
     return WorkbenchContext(db_path=db, documents_dir=docs, events=events,
                             jobs=jobs, research=research,
                             knowledge=knowledge, workspace=workspace,
@@ -289,6 +332,7 @@ def create_context(*, db_path=None, documents_dir=None, offline: bool = False,
                                 literature_factory=_literature_provider_factory(offline)),
                             research_report=ResearchReportApplication(db),
                             final_audit=FinalAuditApplication(db),
+                            research_intelligence=intelligence,
                             offline=offline)
 
 

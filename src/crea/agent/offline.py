@@ -233,6 +233,66 @@ def build_offline_workflow_stack(*, extractor=None, compound_provider=None,
     return workflow, library, evidence_sink, registry
 
 
+def build_offline_intelligence_stack(*, knowledge_base=None, policy=None):
+    """The *enforcing* tool registry over the offline fixtures (M2.0).
+
+    Same fixture literature, same fake retrosynthesis, same tools as the
+    workflow stack -- what differs is the driver and the registry. The
+    driver is the AI Research Intelligence, and it needs the registry that
+    enforces the M1.1 execution policy (`build_agent_tools`), because a
+    model-driven loop may not be allowed to run a persistent write without
+    approval or reach the network behind the offline flag.
+
+    `policy` defaults to the restrictive one *about effects*: model-calling
+    tools are refused and a persistent write needs a human approval. It
+    does NOT set `allow_network=False`, and saying why matters: the tools
+    declare `access=("network",)` because their *live* backends reach the
+    network, while this stack wires them to `FixtureTransport`, which
+    cannot open a socket by construction. The offline guarantee here is
+    the transport, not the policy flag -- and a caller that wants the
+    stricter flag can pass `policy=` and watch `search_literature` come
+    back as `NEEDS_INPUT` with `NETWORK_NOT_ALLOWED`, which is an honest
+    refusal rather than a silent downgrade.
+
+    Returns `(registry, library, evidence_sink)` -- the caller builds the
+    intelligence, because an offline stack has no model to decide with.
+    """
+    from crea.agent.tool_surface import build_agent_tools
+    from crea.agent.tools import ExecutionPolicy
+    from crea.agent.workspace import IdentityState, RouteWorkbench
+    from crea.providers.fake_retrosynthesis import FakeRetrosynthesisProvider
+    from crea.services.identity import IdentityResolutionService
+    from crea.services.route_validation import RouteValidationService
+
+    if knowledge_base is not None:
+        entities = knowledge_base.entity_registry()
+        reactions = knowledge_base.reaction_registry()
+    else:
+        entities = None
+        reactions = None
+
+    transport = FixtureTransport({OA: _openalex_payload(), CR: _crossref_payload()})
+    literature = LiteratureService(providers={
+        "openalex": OpenAlexProvider(transport=transport, endpoint=OA),
+        "crossref": CrossrefProvider(transport=transport, endpoint=CR),
+    })
+    library = DocumentLibrary(LocalDocumentService(PypdfDocumentParser()))
+    evidence_sink: list = []
+    routes = RouteWorkbench(provider=FakeRetrosynthesisProvider(),
+                            validator=RouteValidationService())
+    identity = IdentityState(service=IdentityResolutionService())
+    semantic_resolver = _semantic_resolver(
+        identity_service=getattr(identity, "service", None),
+        compound_provider=None, entity_registry=entities)
+    registry = build_agent_tools(
+        literature, library, evidence_sink, routes=routes, identity=identity,
+        entities=entities, reactions=reactions,
+        knowledge_base=knowledge_base, semantic_resolver=semantic_resolver,
+        policy=policy or ExecutionPolicy(allow_network=True,
+                                         allow_model_calls=False))
+    return registry, library, evidence_sink
+
+
 def plan(question: str, document_id: str) -> list[AgentAction]:
     """The demo's script.
 

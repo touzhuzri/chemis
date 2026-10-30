@@ -11,6 +11,13 @@ from crea.agent.chemistry_agent import (
     ChemistryAgent,
     ToolRegistryLike,
 )
+from crea.agent.intelligence import (
+    IntelligenceRunResult,
+    ResearchBudget,
+    ResearchIntelligence,
+    ResearchMode,
+)
+from crea.agent.intelligence_runtime import AiResearchRuntime
 from crea.agent.live import build_live_stack
 from crea.agent.loop import MAX_STEPS, MAX_TOOL_CALLS, ResearchAgent
 from crea.agent.observer import Observation, ObservationKind, observe
@@ -23,9 +30,11 @@ from crea.agent.toolsets import build_registry
 from crea.agent.workspace import DocumentLibrary
 
 __all__ = [
-    "ChemistryAgent", "CoreAgentRuntime", "DocumentLibrary", "MAX_ITERATIONS",
+    "AiResearchRuntime", "ChemistryAgent", "CoreAgentRuntime",
+    "DocumentLibrary", "IntelligenceRunResult", "MAX_ITERATIONS",
     "MAX_STEPS", "MAX_TOOL_CALLS", "Observation", "ObservationKind",
-    "PlanDecision", "PlanSession", "Planner", "ResearchAgent", "RuntimeResult",
+    "PlanDecision", "PlanSession", "Planner", "ResearchAgent", "ResearchBudget",
+    "ResearchIntelligence", "ResearchMode", "RuntimeResult",
     "SYSTEM", "ToolRegistry", "ToolRegistryLike", "ToolSpec", "UserPrompt",
     "build_agent_tools", "build_live_stack", "build_registry", "observe",
 ]

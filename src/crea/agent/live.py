@@ -163,6 +163,79 @@ def build_live_workflow_stack(*, knowledge_base=None):
     return workflow, library, evidence_sink, registry
 
 
+def build_live_intelligence_stack(*, knowledge_base=None, policy=None):
+    """The *enforcing* tool registry over the real providers (M2.0).
+
+    Same providers, tools and identity chain as the live workflow stack.
+    What differs is the registry: `build_agent_tools` enforces the M1.1
+    execution policy, which is what a model-driven loop needs -- the model
+    picks the tool, and the registry still decides whether the network, a
+    model-calling tool or a persistent write is allowed here.
+
+    `policy` defaults to the permissive-but-checked live one: network and
+    model-calling tools are allowed (that is what "live" means), and
+    persistent writes still require a human approval on the call.
+
+    Returns `(registry, library, evidence_sink)`. The caller supplies the
+    LLM: a composition root wires the credential, and this module never
+    builds a model of its own.
+    """
+    import os
+
+    from crea.agent.tool_surface import build_agent_tools
+    from crea.agent.tools import ExecutionPolicy
+    from crea.agent.workspace import IdentityState, RouteWorkbench
+    from crea.services.identity import IdentityResolutionService
+    from crea.services.route_validation import RouteValidationService
+    from crea.sources.aizynthfinder import AiZynthFinderAdapter
+
+    transport = HttpxTransport()
+    literature = LiteratureService(providers={
+        "openalex": OpenAlexProvider(transport=transport),
+        "crossref": CrossrefProvider(transport=transport),
+    })
+
+    compound_provider = None
+    try:
+        from crea.providers.pubchem import PubChemProvider
+
+        compound_provider = PubChemProvider(transport=transport)
+    except Exception:  # noqa: BLE001 - name lookup is optional
+        compound_provider = None
+
+    extractor = None
+    if os.environ.get("CREA_LLM_API_KEY", "").strip():
+        try:
+            from crea.llm import LLMConfig, OpenAICompatibleLLMProvider
+            from crea.services.reaction_extraction import ReactionExtractor
+
+            extractor = ReactionExtractor(
+                OpenAICompatibleLLMProvider(LLMConfig.from_env()))
+        except Exception:  # noqa: BLE001 - without a usable key: no extraction
+            extractor = None
+
+    library = DocumentLibrary(LocalDocumentService(PypdfDocumentParser()))
+    evidence_sink: list = []
+    routes = RouteWorkbench(provider=AiZynthFinderAdapter(),
+                            validator=RouteValidationService())
+    identity = IdentityState(service=IdentityResolutionService(
+        compound_provider=compound_provider))
+    entities = (knowledge_base.entity_registry()
+                if knowledge_base is not None else None)
+    reactions = (knowledge_base.reaction_registry()
+                 if knowledge_base is not None else None)
+    semantic_resolver = _live_semantic_resolver(
+        identity_service=identity.service, compound_provider=compound_provider,
+        entity_registry=entities)
+    registry = build_agent_tools(
+        literature, library, evidence_sink, extractor=extractor, routes=routes,
+        identity=identity, entities=entities, reactions=reactions,
+        knowledge_base=knowledge_base, semantic_resolver=semantic_resolver,
+        policy=policy or ExecutionPolicy(allow_network=True,
+                                         allow_model_calls=True))
+    return registry, library, evidence_sink
+
+
 ENV_CROSSREF_MAILTO = "CREA_CROSSREF_MAILTO"
 ENV_OPENALEX_API_KEY = "CREA_OPENALEX_API_KEY"
 ENV_OPENALEX_MAILTO = "CREA_OPENALEX_MAILTO"

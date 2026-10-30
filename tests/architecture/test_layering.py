@@ -920,3 +920,113 @@ def test_transformation_references_the_existing_reaction_and_never_replaces_it()
             raise AssertionError(f"second model: {node.name}")
     assert "from crea.core.models.reaction_knowledge import Reaction" in text
     assert "reaction: Reaction" in text
+
+
+# ---------------------------------------------------------------------------
+# M2.0: the AI Research Intelligence is the one research decision centre.
+# ---------------------------------------------------------------------------
+
+
+def test_the_intelligence_layer_reaches_only_downward():
+    """`agent/intelligence*.py` may use core, the agent's own registry,
+    observer and runtime, the LLM boundary and the study-context service.
+    It may never reach SQLite, a provider implementation, a transport, a
+    golden-case service or a web framework -- the decision loop is an
+    agent-layer citizen, not an infrastructure one."""
+    forbidden = (
+        "rdkit", "sqlite3", "crea.repositories", "crea.providers",
+        "crea.sources", "crea.semantic", "crea.app", "crea.api",
+        "crea.evaluation", "golden_case_unseal", "reference_content",
+        "httpx", "requests", "openai", "anthropic", "fastapi",
+    )
+    for path in _python_files("agent"):
+        if not path.name.startswith("intelligence"):
+            continue
+        for name in _imports(path):
+            assert not any(name == f or name.startswith(f + ".")
+                           for f in forbidden), (
+                f"{path.name} imports {name}: the decision loop reaches "
+                f"core, the registry and the LLM boundary, nothing else")
+
+
+def test_the_ai_research_entry_names_neither_a_vendor_nor_a_store():
+    """The M2.0 product entry (`app/research_intelligence.py`) is the
+    application layer: it may not name the LLM boundary, a provider, a
+    transport, RDKit or SQLite. Its LLM and its tool registry arrive as
+    injected factories built by the composition root -- exactly the rule
+    the rest of `app/` already follows."""
+    forbidden = (
+        "rdkit", "sqlite3", "fastapi", "crea.providers", "crea.sources",
+        "httpx", "requests", "openai", "anthropic",
+    )
+    for rel in ("app/research_intelligence.py", "report/intelligence.py",
+                "core/models/research_decision.py"):
+        for name in _imports(SRC / rel):
+            assert not any(name == f or name.startswith(f + ".")
+                           for f in forbidden), (
+                f"{rel} imports {name}")
+            assert not name.startswith("crea.llm"), (
+                f"{rel} imports {name}: the entry receives a provider, "
+                f"it never builds one; redaction lives in crea.core")
+
+
+def test_the_decision_protocol_carries_no_execution_path():
+    """A decision names a tool and a JSON object. There is no code field,
+    and no path by which model text becomes executable -- checked on the
+    syntax tree of the model module and of the loop that reads it."""
+    banned = ("eval(", "exec(", "compile(", "__import__", "os.system",
+              "subprocess.", "importlib.import_module")
+    for rel in ("core/models/research_decision.py", "agent/intelligence.py",
+                "agent/intelligence_prompt.py",
+                "agent/intelligence_runtime.py"):
+        text = (SRC / rel).read_text(encoding="utf-8")
+        for needle in banned:
+            assert needle not in text, f"{rel}: {needle}"
+
+
+def test_the_intelligence_does_not_bypass_the_registry():
+    """Every tool execution goes through `ToolRegistry.execute`. A direct
+    `spec.run(...)` call anywhere in the loop would be a second execution
+    path that skips the policy, the approval guard and the output limit."""
+    path = SRC / "agent" / "intelligence.py"
+    tree = ast.parse(path.read_text(encoding="utf-8"))
+    offenders = []
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Attribute) and node.attr == "run":
+            # `self.run(...)` is the intelligence re-entering itself from
+            # `resume`; anything else calling `.run` would be reaching for
+            # a `ToolSpec.run` and skipping the registry's guards.
+            owner = ast.unparse(node.value)
+            if owner != "self":
+                offenders.append(f"{path.name}:{node.lineno} {owner}.run")
+    assert not offenders, f"a second execution path around the registry: {offenders}"
+    source = path.read_text(encoding="utf-8")
+    assert "self._registry.execute(" in source
+    assert ".arguments_model.model_validate(" in source, (
+        "the validator checks the tool's own schema before the call")
+
+
+def test_the_blind_runner_can_drive_the_ai_loop_without_seeing_the_store():
+    """The runtime adapter translates the intelligence into the M1.4
+    result vocabulary. It names neither the golden-case services nor the
+    repositories: `run_blind_case` hands it a runtime-shaped object and
+    keeps its own two-door isolation."""
+    path = SRC / "agent" / "intelligence_runtime.py"
+    imported = _imports(path)
+    for banned in ("crea.services.golden_case_store",
+                   "crea.services.golden_case_unseal",
+                   "crea.services.reference_content",
+                   "crea.repositories", "crea.evaluation"):
+        assert banned not in imported, f"intelligence_runtime.py imports {banned}"
+
+
+def test_the_composition_roots_are_the_only_ones_that_build_a_provider():
+    """Offline and live are the composition roots that choose which ends
+    are real. The decision loop, the entry and the API never name one."""
+    for rel in ("agent/intelligence.py", "agent/intelligence_prompt.py",
+                "agent/intelligence_runtime.py",
+                "app/research_intelligence.py"):
+        imported = _imports(SRC / rel)
+        assert "crea.llm.openai_compatible" not in imported, rel
+        assert "crea.agent.live" not in imported, rel
+        assert "crea.agent.offline" not in imported, rel

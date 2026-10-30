@@ -1,4 +1,15 @@
-"""The agent loop.
+"""The legacy agent loop (superseded as the research decision centre by M2.0).
+
+**M2.0 status.** This loop's reply shape (`AgentAction`), its stop contract
+and its claim resolution are what `crea.agent.intelligence` replaces with
+the single `ResearchDecision` protocol. `crea research --ai` and
+`POST /api/research/intelligence` drive the new loop. What stays here is
+compatibility: the offline demo stack, `build_offline_stack` /
+`build_live_stack`, and the tests that pin this behaviour. Nothing new
+should be built on this class -- a caller that wants a model-driven
+research loop wants `ResearchIntelligence`.
+
+The loop itself:
 
 ```
 ResearchTask

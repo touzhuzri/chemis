@@ -71,6 +71,13 @@ def _build_parser() -> argparse.ArgumentParser:
                    help="the knowledge base this research writes to and "
                         "reuses (default: data/crea.db under the working "
                         "directory)")
+    r.add_argument("--ai", action="store_true",
+                   help="run through the AI Research Intelligence (M2.0): "
+                        "the model decides every next research move. Needs "
+                        "--provider openai-compatible and CREA_LLM_API_KEY")
+    r.add_argument("--study", default=None,
+                   help="the study this --ai run continues (default: a new "
+                        "study per run)")
 
     # -- kb: query accumulated knowledge without running research (§39)
     k = sub.add_parser(
@@ -150,11 +157,81 @@ def _research(args) -> int:
     # --save-json is the acceptance spelling of --save (§十): one meaning,
     # two spellings, normalized here so the handlers see one.
     args.save = args.save or args.save_json
+    if getattr(args, "ai", False):
+        return _research_ai(args, question)
     workflow_form = (args.question_opt is not None or args.smiles is not None
                      or args.output is not None or args.pdf is not None)
     if workflow_form:
         return _research_workflow(args, question)
     return _research_agent(args, question)
+
+
+def _research_ai(args, question: str) -> int:
+    """One research question, driven by the AI Research Intelligence (M2.0).
+
+    The model decides every next move -- which tool, which hypothesis,
+    when to stop -- and this command is the CLI's door onto that loop.
+    It is a different loop from `ResearchWorkflow` (a fixed pipeline) and
+    from the legacy `ResearchAgent` (whose reply shape and stop contract
+    this replaces): there is exactly one AI research decision centre.
+
+    A run needs a real model. `--provider fake` has none, and says so --
+    there is no scripted fallback that then reports an "AI research"
+    result, because a report that looks researched and was not is the one
+    outcome this project exists to prevent.
+    """
+    import pathlib
+
+    from crea.app.research_intelligence import ResearchIntelligenceApplication
+
+    if args.provider != "openai-compatible":
+        print("error: --ai 需要真实模型：请加 --provider openai-compatible "
+              "并设置 CREA_LLM_API_KEY。离线固定流程请使用不带 --ai 的 "
+              "crea research。", file=sys.stderr)
+        return 2
+
+    db_path = pathlib.Path(args.db) if args.db else pathlib.Path("data/crea.db")
+    db_path.parent.mkdir(parents=True, exist_ok=True)
+
+    def llm_factory():
+        from crea.llm import LLMConfig, OpenAICompatibleLLMProvider
+
+        return OpenAICompatibleLLMProvider(LLMConfig.from_env())
+
+    def stack_factory(document_ids=None):
+        from crea.agent.live import build_live_intelligence_stack
+        from crea.services.knowledge_base import KnowledgeBase
+
+        knowledge_base = KnowledgeBase(db_path)
+        knowledge_base.initialize()
+        registry, _library, _sink = build_live_intelligence_stack(
+            knowledge_base=knowledge_base)
+        return registry, _library, _sink
+
+    try:
+        application = ResearchIntelligenceApplication(
+            db_path=db_path, llm_factory=llm_factory,
+            stack_factory=stack_factory)
+        result = application.start(
+            question, study_id=args.study or "",
+            document_ids=list(args.document or []))
+    except Exception as exc:  # noqa: BLE001 - a run that cannot start is an error
+        print(f"error: AI 研究无法启动：{exc}", file=sys.stderr)
+        return 2
+
+    if args.json:
+        print(json.dumps(result, ensure_ascii=False, indent=2))
+    else:
+        print(application.report(result["session_id"]))
+    if result.get("awaiting"):
+        print("", file=sys.stderr)
+        print(f"研究已暂停，等待回答。会话：{result['session_id']}",
+              file=sys.stderr)
+        print("回答方式：POST /api/research/intelligence/"
+              f"{result['session_id']}/answer", file=sys.stderr)
+    return 0 if result["outcome"] in ("completed", "partial",
+                                      "no_results",
+                                      "input_required") else 2
 
 
 def _research_workflow(args, question: str) -> int:
