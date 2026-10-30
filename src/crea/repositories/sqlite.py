@@ -101,6 +101,17 @@ from crea.core.models.task_workflow import (
     WorkflowTask,
 )
 from crea.core.models.session import ResearchSession, WorkflowStatus
+from crea.core.models.study_context import (
+    FactVerification,
+    HypothesisStatus,
+    IdentityCandidate,
+    IdentitySelectionRecord,
+    IssueStatus,
+    StudyDecision,
+    StudyFact,
+    StudyHypothesis,
+    UnresolvedIssue,
+)
 from crea.core.models.workspace import Workspace, WorkspaceMessage
 from crea.core.provenance import Provenance, utc_now_iso
 from crea.repositories.errors import (
@@ -549,6 +560,84 @@ _SCHEMA_STATEMENTS = (
         content_json  TEXT NOT NULL,
         position      INTEGER NOT NULL,
         PRIMARY KEY (study_id, artifact_id)
+    )""",
+    # -- study context (M1.5): what one study knows across sessions. Every
+    #    table is keyed by study_id first: isolation is the schema's job, not
+    #    only the service's. Additive -- schema version stays v1; initialize()
+    #    creates missing tables on an existing v1 database.
+    """CREATE TABLE IF NOT EXISTS study_context_facts (
+        study_id          TEXT NOT NULL REFERENCES research_studies(study_id) ON DELETE CASCADE,
+        fact_id           TEXT NOT NULL,
+        session_id        TEXT NOT NULL DEFAULT '',
+        fact_type         TEXT NOT NULL,
+        verification      TEXT NOT NULL,
+        source            TEXT NOT NULL DEFAULT '',
+        entity_id         TEXT NOT NULL DEFAULT '',
+        summary           TEXT NOT NULL DEFAULT '',
+        payload_json      TEXT NOT NULL DEFAULT '{}',
+        provenance_json   TEXT,
+        evidence_ids_json TEXT NOT NULL DEFAULT '[]',
+        created_at        TEXT NOT NULL,
+        position          INTEGER NOT NULL,
+        PRIMARY KEY (study_id, fact_id)
+    )""",
+    """CREATE TABLE IF NOT EXISTS study_context_hypotheses (
+        study_id                    TEXT NOT NULL REFERENCES research_studies(study_id) ON DELETE CASCADE,
+        hypothesis_id               TEXT NOT NULL,
+        session_id                  TEXT NOT NULL DEFAULT '',
+        content                     TEXT NOT NULL,
+        entity_id                   TEXT NOT NULL DEFAULT '',
+        status                      TEXT NOT NULL,
+        supporting_evidence_json    TEXT NOT NULL DEFAULT '[]',
+        contradicting_evidence_json TEXT NOT NULL DEFAULT '[]',
+        created_at                  TEXT NOT NULL,
+        updated_at                  TEXT NOT NULL,
+        note                        TEXT NOT NULL DEFAULT '',
+        position                    INTEGER NOT NULL,
+        PRIMARY KEY (study_id, hypothesis_id)
+    )""",
+    """CREATE TABLE IF NOT EXISTS study_context_decisions (
+        study_id             TEXT NOT NULL REFERENCES research_studies(study_id) ON DELETE CASCADE,
+        decision_id          TEXT NOT NULL,
+        session_id           TEXT NOT NULL DEFAULT '',
+        decision             TEXT NOT NULL,
+        reason               TEXT NOT NULL DEFAULT '',
+        observation_kind     TEXT NOT NULL DEFAULT '',
+        plan_change_kinds_json TEXT NOT NULL DEFAULT '[]',
+        entity_ids_json      TEXT NOT NULL DEFAULT '[]',
+        evidence_ids_json    TEXT NOT NULL DEFAULT '[]',
+        hypothesis_ids_json  TEXT NOT NULL DEFAULT '[]',
+        created_at           TEXT NOT NULL,
+        position             INTEGER NOT NULL,
+        PRIMARY KEY (study_id, decision_id)
+    )""",
+    """CREATE TABLE IF NOT EXISTS study_context_issues (
+        study_id    TEXT NOT NULL REFERENCES research_studies(study_id) ON DELETE CASCADE,
+        issue_id    TEXT NOT NULL,
+        session_id  TEXT NOT NULL DEFAULT '',
+        kind        TEXT NOT NULL,
+        content     TEXT NOT NULL,
+        status      TEXT NOT NULL,
+        entity_id   TEXT NOT NULL DEFAULT '',
+        created_at  TEXT NOT NULL,
+        resolved_at TEXT NOT NULL DEFAULT '',
+        resolution  TEXT NOT NULL DEFAULT '',
+        position    INTEGER NOT NULL,
+        PRIMARY KEY (study_id, issue_id)
+    )""",
+    """CREATE TABLE IF NOT EXISTS study_context_identity_records (
+        study_id                 TEXT NOT NULL REFERENCES research_studies(study_id) ON DELETE CASCADE,
+        record_id                TEXT NOT NULL,
+        session_id               TEXT NOT NULL DEFAULT '',
+        question                 TEXT NOT NULL DEFAULT '',
+        candidates_json          TEXT NOT NULL DEFAULT '[]',
+        selected_index           INTEGER,
+        selected_by              TEXT NOT NULL DEFAULT '',
+        user_selection_statement TEXT NOT NULL DEFAULT '',
+        selected_at              TEXT NOT NULL DEFAULT '',
+        created_at               TEXT NOT NULL,
+        position                 INTEGER NOT NULL,
+        PRIMARY KEY (study_id, record_id)
     )""",
     # -- research workflows (Stage 7.2): a bounded task set over a session.
     #    Tasks reference artifacts by id; they never copy results.
@@ -2189,6 +2278,193 @@ class SQLiteStore:
             study=study, references=self.list_study_references(study_id),
             events=self.list_study_events(study_id),
             artifacts=self.list_study_artifacts(study_id))
+
+    # -- study context (M1.5) -----------------------------------------------
+    #
+    # Every statement is keyed by study_id first and ordered by the explicit
+    # append position: isolation and determinism are the storage's job, and a
+    # context row that outlived its study cannot exist (ON DELETE CASCADE).
+
+    def save_study_fact(self, study_id: str, fact: "StudyFact") -> "StudyFact":
+        rows = self._query(
+            "SELECT COALESCE(MAX(position), 0) + 1 AS next "
+            "FROM study_context_facts WHERE study_id = ?", (study_id,))
+        self._execute(
+            "INSERT INTO study_context_facts (study_id, fact_id, session_id, "
+            "fact_type, verification, source, entity_id, summary, "
+            "payload_json, provenance_json, evidence_ids_json, created_at, "
+            "position) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)",
+            (study_id, fact.fact_id, fact.session_id, fact.fact_type,
+             fact.verification.value, fact.source, fact.entity_id,
+             fact.summary, dump_json(scrub(fact.payload)),
+             dump_json(scrub(fact.provenance)) if fact.provenance is not None
+             else None,
+             dump_json(fact.evidence_ids), fact.created_at, rows[0]["next"]))
+        return fact
+
+    def list_study_facts(self, study_id: str) -> list["StudyFact"]:
+        rows = self._query(
+            "SELECT * FROM study_context_facts WHERE study_id = ? "
+            "ORDER BY position", (study_id,))
+        return [StudyFact(
+            fact_id=r["fact_id"], study_id=study_id, session_id=r["session_id"],
+            fact_type=r["fact_type"],
+            verification=FactVerification(r["verification"]),
+            source=r["source"], entity_id=r["entity_id"], summary=r["summary"],
+            payload=load_json(r["payload_json"]) or {},
+            provenance=load_json(r["provenance_json"]),
+            evidence_ids=load_json(r["evidence_ids_json"]) or [],
+            created_at=r["created_at"]) for r in rows]
+
+    def save_study_hypothesis(self, study_id: str,
+                              hypothesis: "StudyHypothesis") -> "StudyHypothesis":
+        # Upsert: a status change rewrites one row in place, keeping its id,
+        # creation time and position -- the hypothesis is the same object
+        # throughout, and its history is the statuses it passed through as
+        # recorded by the service, never a second row.
+        rows = self._query(
+            "SELECT COALESCE(MAX(position), 0) + 1 AS next "
+            "FROM study_context_hypotheses WHERE study_id = ?", (study_id,))
+        self._execute(
+            "INSERT INTO study_context_hypotheses (study_id, hypothesis_id, "
+            "session_id, content, entity_id, status, supporting_evidence_json, "
+            "contradicting_evidence_json, created_at, updated_at, note, "
+            "position) VALUES (?,?,?,?,?,?,?,?,?,?,?,?) "
+            "ON CONFLICT(study_id, hypothesis_id) DO UPDATE SET "
+            "status=excluded.status, "
+            "supporting_evidence_json=excluded.supporting_evidence_json, "
+            "contradicting_evidence_json=excluded.contradicting_evidence_json, "
+            "updated_at=excluded.updated_at, note=excluded.note",
+            (study_id, hypothesis.hypothesis_id, hypothesis.session_id,
+             hypothesis.content, hypothesis.entity_id, hypothesis.status.value,
+             dump_json(hypothesis.supporting_evidence_ids),
+             dump_json(hypothesis.contradicting_evidence_ids),
+             hypothesis.created_at, hypothesis.updated_at, hypothesis.note,
+             rows[0]["next"]))
+        return hypothesis
+
+    def list_study_hypotheses(self, study_id: str) -> list["StudyHypothesis"]:
+        rows = self._query(
+            "SELECT * FROM study_context_hypotheses WHERE study_id = ? "
+            "ORDER BY position", (study_id,))
+        return [StudyHypothesis(
+            hypothesis_id=r["hypothesis_id"], study_id=study_id,
+            session_id=r["session_id"], content=r["content"],
+            entity_id=r["entity_id"], status=HypothesisStatus(r["status"]),
+            supporting_evidence_ids=load_json(
+                r["supporting_evidence_json"]) or [],
+            contradicting_evidence_ids=load_json(
+                r["contradicting_evidence_json"]) or [],
+            created_at=r["created_at"], updated_at=r["updated_at"],
+            note=r["note"]) for r in rows]
+
+    def save_study_decision(self, study_id: str,
+                            decision: "StudyDecision") -> "StudyDecision":
+        rows = self._query(
+            "SELECT COALESCE(MAX(position), 0) + 1 AS next "
+            "FROM study_context_decisions WHERE study_id = ?", (study_id,))
+        self._execute(
+            "INSERT INTO study_context_decisions (study_id, decision_id, "
+            "session_id, decision, reason, observation_kind, "
+            "plan_change_kinds_json, entity_ids_json, evidence_ids_json, "
+            "hypothesis_ids_json, created_at, position) "
+            "VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
+            (study_id, decision.decision_id, decision.session_id,
+             decision.decision, decision.reason, decision.observation_kind,
+             dump_json(decision.plan_change_kinds),
+             dump_json(decision.entity_ids),
+             dump_json(decision.evidence_ids),
+             dump_json(decision.hypothesis_ids), decision.created_at,
+             rows[0]["next"]))
+        return decision
+
+    def list_study_decisions(self, study_id: str) -> list["StudyDecision"]:
+        rows = self._query(
+            "SELECT * FROM study_context_decisions WHERE study_id = ? "
+            "ORDER BY position", (study_id,))
+        return [StudyDecision(
+            decision_id=r["decision_id"], study_id=study_id,
+            session_id=r["session_id"], decision=r["decision"],
+            reason=r["reason"], observation_kind=r["observation_kind"],
+            plan_change_kinds=load_json(r["plan_change_kinds_json"]) or [],
+            entity_ids=load_json(r["entity_ids_json"]) or [],
+            evidence_ids=load_json(r["evidence_ids_json"]) or [],
+            hypothesis_ids=load_json(r["hypothesis_ids_json"]) or [],
+            created_at=r["created_at"]) for r in rows]
+
+    def save_unresolved_issue(self, study_id: str,
+                              issue: "UnresolvedIssue") -> "UnresolvedIssue":
+        rows = self._query(
+            "SELECT COALESCE(MAX(position), 0) + 1 AS next "
+            "FROM study_context_issues WHERE study_id = ?", (study_id,))
+        self._execute(
+            "INSERT INTO study_context_issues (study_id, issue_id, session_id, "
+            "kind, content, status, entity_id, created_at, resolved_at, "
+            "resolution, position) VALUES (?,?,?,?,?,?,?,?,?,?,?)",
+            (study_id, issue.issue_id, issue.session_id, issue.kind,
+             issue.content, issue.status.value, issue.entity_id,
+             issue.created_at, issue.resolved_at, issue.resolution,
+             rows[0]["next"]))
+        return issue
+
+    def update_unresolved_issue(self, study_id: str,
+                                issue: "UnresolvedIssue") -> "UnresolvedIssue":
+        self._execute(
+            "UPDATE study_context_issues SET status = ?, resolved_at = ?, "
+            "resolution = ? WHERE study_id = ? AND issue_id = ?",
+            (issue.status.value, issue.resolved_at, issue.resolution,
+             study_id, issue.issue_id))
+        return issue
+
+    def list_unresolved_issues(self, study_id: str) -> list["UnresolvedIssue"]:
+        rows = self._query(
+            "SELECT * FROM study_context_issues WHERE study_id = ? "
+            "ORDER BY position", (study_id,))
+        return [UnresolvedIssue(
+            issue_id=r["issue_id"], study_id=study_id,
+            session_id=r["session_id"], kind=r["kind"], content=r["content"],
+            status=IssueStatus(r["status"]), entity_id=r["entity_id"],
+            created_at=r["created_at"], resolved_at=r["resolved_at"],
+            resolution=r["resolution"]) for r in rows]
+
+    def save_identity_record(self, study_id: str,
+                             record: "IdentitySelectionRecord"
+                             ) -> "IdentitySelectionRecord":
+        rows = self._query(
+            "SELECT COALESCE(MAX(position), 0) + 1 AS next "
+            "FROM study_context_identity_records WHERE study_id = ?",
+            (study_id,))
+        self._execute(
+            "INSERT INTO study_context_identity_records (study_id, record_id, "
+            "session_id, question, candidates_json, selected_index, "
+            "selected_by, user_selection_statement, selected_at, created_at, "
+            "position) VALUES (?,?,?,?,?,?,?,?,?,?,?) "
+            "ON CONFLICT(study_id, record_id) DO UPDATE SET "
+            "selected_index=excluded.selected_index, "
+            "selected_by=excluded.selected_by, "
+            "user_selection_statement=excluded.user_selection_statement, "
+            "selected_at=excluded.selected_at",
+            (study_id, record.record_id, record.session_id, record.question,
+             dump_json([c.model_dump(mode="json") for c in record.candidates]),
+             record.selected_index, record.selected_by,
+             record.user_selection_statement, record.selected_at,
+             record.created_at, rows[0]["next"]))
+        return record
+
+    def list_identity_records(self, study_id: str) -> list["IdentitySelectionRecord"]:
+        rows = self._query(
+            "SELECT * FROM study_context_identity_records WHERE study_id = ? "
+            "ORDER BY position", (study_id,))
+        return [IdentitySelectionRecord(
+            record_id=r["record_id"], study_id=study_id,
+            session_id=r["session_id"], question=r["question"],
+            candidates=[IdentityCandidate(**c) for c in (
+                load_json(r["candidates_json"]) or [])],
+            selected_index=r["selected_index"],
+            selected_by=r["selected_by"],
+            user_selection_statement=r["user_selection_statement"],
+            selected_at=r["selected_at"],
+            created_at=r["created_at"]) for r in rows]
 
     # -- research workflows (Stage 7.2) -------------------------------------
 

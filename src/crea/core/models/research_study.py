@@ -109,6 +109,13 @@ class ArtifactType(str, Enum):
     RESEARCH_REPORT = "research_report"
     #: Stage 7.4: a final audit of a study (and one of its reports).
     FINAL_AUDIT = "final_audit"
+    #: M1.5: the study context profile (goal, constraints), its evidence
+    #: references, and one session's execution summary -- results that cannot
+    #: be recomputed (§十七), so they are artifacts on the existing study
+    #: container rather than new tables.
+    STUDY_CONTEXT = "study_context"
+    STUDY_EVIDENCE_REF = "study_evidence_ref"
+    SESSION_SUMMARY = "session_summary"
 
 
 class StudyReference(BaseModel):

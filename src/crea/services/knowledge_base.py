@@ -236,6 +236,41 @@ class KnowledgeBase:
     def get_study_detail(self, study_id: str):
         return self._store.get_study_detail(study_id)
 
+    # -- study context (M1.5) -----------------------------------------------
+
+    def save_study_fact(self, study_id: str, fact):
+        return self._store.save_study_fact(study_id, fact)
+
+    def list_study_facts(self, study_id: str):
+        return self._store.list_study_facts(study_id)
+
+    def save_study_hypothesis(self, study_id: str, hypothesis):
+        return self._store.save_study_hypothesis(study_id, hypothesis)
+
+    def list_study_hypotheses(self, study_id: str):
+        return self._store.list_study_hypotheses(study_id)
+
+    def save_study_decision(self, study_id: str, decision):
+        return self._store.save_study_decision(study_id, decision)
+
+    def list_study_decisions(self, study_id: str):
+        return self._store.list_study_decisions(study_id)
+
+    def save_unresolved_issue(self, study_id: str, issue):
+        return self._store.save_unresolved_issue(study_id, issue)
+
+    def update_unresolved_issue(self, study_id: str, issue):
+        return self._store.update_unresolved_issue(study_id, issue)
+
+    def list_unresolved_issues(self, study_id: str):
+        return self._store.list_unresolved_issues(study_id)
+
+    def save_identity_record(self, study_id: str, record):
+        return self._store.save_identity_record(study_id, record)
+
+    def list_identity_records(self, study_id: str):
+        return self._store.list_identity_records(study_id)
+
     # -- research workflows (Stage 7.2) -------------------------------------
 
     def save_workflow(self, workflow):

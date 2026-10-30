@@ -38,6 +38,7 @@ be made later without translating a second vocabulary.
 
 from __future__ import annotations
 
+import time
 from typing import Any
 
 from pydantic import BaseModel, Field
@@ -51,6 +52,7 @@ from crea.agent.planner import (
     PlanSession,
 )
 from crea.agent.tools import _bound_output
+from crea.core.ids import content_hash
 from crea.core.models.knowledge import ResearchPlanAction
 from crea.core.models.research import (
     ActionKind,
@@ -58,6 +60,12 @@ from crea.core.models.research import (
     TaskStatus,
     ToolResult,
 )
+from crea.core.models.study_context import (
+    FactVerification,
+    IdentityCandidate,
+    StudySessionSummary,
+)
+from crea.core.provenance import utc_now_iso
 
 #: A defense-in-depth cap on loop iterations. The planner's own decision
 #: budget (16) is the real bound; this exists so a planner bug cannot spin.
@@ -99,6 +107,8 @@ class RuntimeResult(BaseModel):
     status: TaskStatus
     #: "completed" | "partial" | "input_required" | "no_results" | "failed".
     outcome: str
+    #: The M1.5 session this run belongs to (empty when no study context).
+    session_id: str = ""
     reason: str
     decision: PlanDecision
     session: PlanSession
@@ -129,11 +139,18 @@ class CoreAgentRuntime:
     def __init__(self, registry: Any, llm: Any = None, *,
                  planner: Planner | None = None,
                  max_iterations: int = MAX_RUNTIME_ITERATIONS,
-                 context_budget_chars: int = DEFAULT_CONTEXT_BUDGET_CHARS) -> None:
+                 context_budget_chars: int = DEFAULT_CONTEXT_BUDGET_CHARS,
+                 study_context: Any = None,
+                 study_id: str = "") -> None:
         self._registry = registry
         self._planner = planner if planner is not None else Planner(registry, llm)
         self.max_iterations = max(1, int(max_iterations))
         self.context_budget_chars = max(256, int(context_budget_chars))
+        #: M1.5: the study context service and the study this runtime works
+        #: on. Both absent by default -- without them the run is exactly the
+        #: M1.4 loop, and nothing is written anywhere.
+        self._study_context = study_context
+        self._study_id = study_id
         self._cancelled = False
 
     # -- public API ---------------------------------------------------------
@@ -152,7 +169,8 @@ class CoreAgentRuntime:
             context: dict[str, Any] | None = None,
             approvals: list[str] | None = None,
             plan: Any = None,
-            allow_model_revision: bool = False) -> RuntimeResult:
+            allow_model_revision: bool = False,
+            session_id: str = "") -> RuntimeResult:
         """Plan (or adopt a plan) and run it to a terminal state or a pause.
 
         `plan` adopts an existing `ResearchPlan` instead of generating one --
@@ -161,6 +179,8 @@ class CoreAgentRuntime:
         approved (an operator decision made before the run, recorded like any
         other approval). `allow_model_revision` follows the planner's rule:
         off by default so an ordinary run never pays for a model call.
+        `session_id` names this run inside its study (M1.5); one is generated
+        when the caller does not.
         """
         self._cancelled = False
         context = dict(context or {})
@@ -186,10 +206,18 @@ class CoreAgentRuntime:
 
         diagnostics = [f"plan source: {proposal.source}"]
         diagnostics.extend(proposal.warnings)
+        if not session_id:
+            session_id = "sess-" + content_hash(
+                f"{self._study_id}|{goal}|{time.time_ns()}", 12)
+        self._load_context(session, diagnostics)
         decision = self._planner.start(session)
-        return self._drive(session, decision, steps=[], decisions=[],
-                           evidence=[], diagnostics=diagnostics,
-                           allow_model_revision=allow_model_revision)
+        result = self._drive(session, decision, steps=[], decisions=[],
+                             evidence=[], diagnostics=diagnostics,
+                             allow_model_revision=allow_model_revision,
+                             session_id=session_id)
+        result.session_id = session_id
+        self._close_session(result, session_id)
+        return result
 
     def resume(self, result: RuntimeResult, *, approve_step_id: str = "",
                answers: dict[str, Any] | None = None) -> RuntimeResult:
@@ -211,21 +239,27 @@ class CoreAgentRuntime:
             session.context.update(answers)
         self._cancelled = False
         decision = self._planner.decide(session)
-        return self._drive(session, decision,
-                           steps=list(result.steps),
-                           decisions=list(result.decisions),
-                           evidence=list(result.evidence_ids),
-                           diagnostics=list(result.diagnostics),
-                           allow_model_revision=False)
+        resumed = self._drive(session, decision,
+                              steps=list(result.steps),
+                              decisions=list(result.decisions),
+                              evidence=list(result.evidence_ids),
+                              diagnostics=list(result.diagnostics),
+                              allow_model_revision=False,
+                              session_id=result.session_id)
+        resumed.session_id = result.session_id
+        self._close_session(resumed, resumed.session_id)
+        return resumed
 
     # -- the loop -----------------------------------------------------------
 
     def _drive(self, session: PlanSession, decision: PlanDecision, *,
                steps: list[ResearchStep], decisions: list[PlanDecision],
                evidence: list[str], diagnostics: list[str],
-               allow_model_revision: bool) -> RuntimeResult:
+               allow_model_revision: bool,
+               session_id: str = "") -> RuntimeResult:
         while True:
             decisions.append(decision)
+            self._note_decision(decision, session_id, diagnostics)
             self._sync_facts(session)
 
             if self._cancelled:
@@ -293,6 +327,7 @@ class CoreAgentRuntime:
             for evidence_id in observation.evidence_ids:
                 if evidence_id not in evidence:
                     evidence.append(evidence_id)
+            self._note_observation(step, observation, session_id, diagnostics)
 
             decision = self._planner.decide(
                 session, step.step_id, observation,
@@ -309,6 +344,155 @@ class CoreAgentRuntime:
             observation.step_id = step.step_id
         self._sync_facts(session)
         return result, observation
+
+    # -- study context (M1.5) -----------------------------------------------
+    #
+    # All writes go through the study context service, and only what the M1.1
+    # tool declarations and M1.2 observations already established is written:
+    # the runtime never invents a fact, never promotes a hypothesis, and
+    # never touches stored evidence. A context failure is a diagnostic, not
+    # a research failure -- the run continues and says what was not saved.
+
+    def _load_context(self, session: PlanSession,
+                      diagnostics: list[str]) -> None:
+        """Seed the planner from what this study already knows.
+
+        Tool-verified fact types become session facts (so a prerequisite
+        established in an earlier session is not re-planned), and a user's
+        earlier candidate selection becomes the identity input for this run.
+        """
+        if self._study_context is None or not self._study_id:
+            return
+        try:
+            context = self._study_context.get_context(self._study_id)
+        except Exception as exc:  # noqa: BLE001 - a broken store is a diagnostic
+            diagnostics.append(
+                f"study context load failed: {type(exc).__name__}: {exc}")
+            return
+        for fact in context.facts:
+            if (fact.verification is FactVerification.TOOL_VERIFIED
+                    and fact.fact_type and fact.fact_type not in session.facts):
+                session.facts.append(fact.fact_type)
+        # The registry guards execution against its own SessionFacts, so the
+        # same tool-verified facts are re-seeded there. They were established
+        # by real tool runs in an earlier session (the context attests it);
+        # this hands them back to the gate, it does not bypass it.
+        registry_facts = getattr(self._registry, "facts", None)
+        if registry_facts is not None:
+            for fact in context.facts:
+                if fact.verification is FactVerification.TOOL_VERIFIED \
+                        and fact.fact_type:
+                    try:
+                        registry_facts.add(fact.fact_type)
+                    except Exception:  # noqa: BLE001 - a facts object without add
+                        pass
+        if "identity_input" not in session.context:
+            for record in reversed(context.identity_records):
+                arguments = record.resolve_arguments()
+                if arguments:
+                    session.context["identity_input"] = arguments
+                    break
+        open_issues = [issue.content for issue in context.issues]
+        if open_issues:
+            session.context.setdefault("open_issues", open_issues)
+
+    def _note_observation(self, step: Any, observation: Observation,
+                          session_id: str, diagnostics: list[str]) -> None:
+        """Persist what an execution established -- by its declarations only."""
+        if self._study_context is None or not self._study_id:
+            return
+        try:
+            if (observation.kind is ObservationKind.SUCCESS
+                    and step.tool):
+                for name in self._declared_facts(step.tool, observation):
+                    payload = (observation.data
+                               if isinstance(observation.data, dict)
+                               else {"value": observation.data})
+                    self._study_context.add_fact(
+                        self._study_id, fact_type=name, payload=payload,
+                        summary=observation.summary, source=step.tool,
+                        verification=FactVerification.TOOL_VERIFIED,
+                        provenance=observation.provenance,
+                        evidence_ids=observation.evidence_ids,
+                        session_id=session_id)
+            elif observation.kind in (ObservationKind.UNAVAILABLE,
+                                      ObservationKind.ERROR,
+                                      ObservationKind.NEEDS_INPUT):
+                kind = _ISSUE_KIND.get(observation.kind, "user_input")
+                self._study_context.record_unresolved_issue(
+                    self._study_id,
+                    f"{observation.tool}: {observation.summary}",
+                    kind=kind, session_id=session_id)
+                if (observation.kind is ObservationKind.NEEDS_INPUT
+                        and "user_selection" in observation.missing_requirements):
+                    candidates = _candidates_from(observation.data)
+                    if candidates:
+                        self._study_context.save_identity_candidates(
+                            self._study_id, question=observation.summary,
+                            candidates=candidates, session_id=session_id)
+        except Exception as exc:  # noqa: BLE001 - a context write is not a crash
+            diagnostics.append(
+                f"study context write failed: {type(exc).__name__}: {exc}")
+
+    def _declared_facts(self, tool: str, observation: Observation) -> list[str]:
+        """The fact names this tool call declared, exactly as the registry
+        records them -- never facts inferred from the payload's prose."""
+        getter = getattr(self._registry, "get", None)
+        spec = getter(tool) if callable(getter) else None
+        if spec is None:
+            return []
+        names = list(getattr(spec, "sets_facts", ()) or ())
+        rule = getattr(spec, "fact_rule", None)
+        if callable(rule):
+            try:
+                names.extend(rule(observation.data) or ())
+            except Exception:  # noqa: BLE001 - a fact rule is not a run failure
+                pass
+        return list(dict.fromkeys(n for n in names if n))
+
+    def _note_decision(self, decision: PlanDecision, session_id: str,
+                       diagnostics: list[str]) -> None:
+        """Record the decisions that changed something or ended the run.
+
+        An ordinary CONTINUE is the loop's business, not a research
+        decision; a change (fallback, prerequisite, filled arguments) and
+        every terminal decision are.
+        """
+        if self._study_context is None or not self._study_id:
+            return
+        if not decision.changes and decision.kind is PlanDecisionKind.CONTINUE:
+            return
+        try:
+            self._study_context.record_decision(
+                self._study_id,
+                decision=f"{decision.kind.value}: {decision.reason[:300]}",
+                reason=decision.reason, session_id=session_id,
+                observation_kind=(decision.trigger.kind.value
+                                  if decision.trigger is not None else ""),
+                plan_change_kinds=[change.kind.value
+                                   for change in decision.changes])
+        except Exception as exc:  # noqa: BLE001 - a context write is not a crash
+            diagnostics.append(
+                f"study context write failed: {type(exc).__name__}: {exc}")
+
+    def _close_session(self, result: RuntimeResult, session_id: str) -> None:
+        """Store the session's bounded summary -- unless it merely paused."""
+        if (self._study_context is None or not self._study_id
+                or not session_id or result.awaiting is not None):
+            return
+        try:
+            executed = sum(1 for s in result.steps
+                           if s.result_status is not None)
+            self._study_context.record_session_summary(
+                self._study_id, StudySessionSummary(
+                    session_id=session_id, status=result.status.value,
+                    outcome=result.outcome, ended_at=utc_now_iso(),
+                    step_count=executed,
+                    evidence_ids=list(result.evidence_ids),
+                    note=result.reason[:500]))
+        except Exception as exc:  # noqa: BLE001 - a context write is not a crash
+            result.diagnostics.append(
+                f"study context write failed: {type(exc).__name__}: {exc}")
 
     # -- assembly -----------------------------------------------------------
 
@@ -469,6 +653,41 @@ class CoreAgentRuntime:
         if not isinstance(bounded, dict):  # pragma: no cover - defensive
             return {"truncated": True}
         return bounded
+
+
+#: Which study-context issue kind a hard-failure observation records.
+_ISSUE_KIND = {
+    ObservationKind.UNAVAILABLE: "tool_unavailable",
+    ObservationKind.ERROR: "tool_error",
+    ObservationKind.NEEDS_INPUT: "user_input",
+}
+
+
+def _candidates_from(data: Any) -> list[IdentityCandidate]:
+    """Candidate identities from an ambiguous tool result, as declared.
+
+    `kind`/`value` come from the candidate view's own fields -- a structure
+    when the source stated one, its name otherwise. Nothing is inferred, and
+    the full view is kept in `raw` so the choice can be re-made later.
+    """
+    if not isinstance(data, dict):
+        return []
+    raw_candidates = data.get("candidates")
+    if not isinstance(raw_candidates, list):
+        return []
+    out: list[IdentityCandidate] = []
+    for raw in raw_candidates:
+        if not isinstance(raw, dict):
+            continue
+        smiles = raw.get("canonical_smiles") or ""
+        name = raw.get("candidate_name") or raw.get("input_name") or ""
+        if smiles:
+            out.append(IdentityCandidate(kind="SMILES", value=smiles,
+                                         label=name or smiles, raw=raw))
+        elif name:
+            out.append(IdentityCandidate(kind="NAME", value=name,
+                                         label=name, raw=raw))
+    return out
 
 
 def _trajectory_entry(steps: list[ResearchStep], step: Any) -> ResearchStep:
