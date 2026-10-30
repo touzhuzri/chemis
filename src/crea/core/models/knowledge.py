@@ -35,6 +35,7 @@ where".
 from __future__ import annotations
 
 from enum import Enum
+from typing import Any
 
 from pydantic import BaseModel, Field
 
@@ -176,6 +177,10 @@ class ResearchPlanAction(str, Enum):
     """What a plan step would have the run do. Tool-shaped, not magic."""
 
     ASSESS_KNOWLEDGE = "assess_knowledge"
+    #: M1.3: establish what the user meant before structure-dependent work.
+    RESOLVE_IDENTITY = "resolve_identity"
+    #: M1.3: deterministic computation on a structure the caller supplied.
+    ANALYZE_STRUCTURE = "analyze_structure"
     SEARCH_LITERATURE = "search_literature"
     INSPECT_DOCUMENT = "inspect_document"
     EXTRACT_REACTION_EVIDENCE = "extract_reaction_evidence"
@@ -186,12 +191,35 @@ class ResearchPlanAction(str, Enum):
 
 
 class ResearchPlanStep(BaseModel):
+    """One step: what to run, on what, after what.
+
+    The pre-M1.3 fields (`action`, `reason`, `gap_facet`, `tool`) keep their
+    meaning. The additive fields let the Planner express the parts a plan
+    needs to be executed and audited -- a stable id, its dependencies, the
+    arguments to send, and what "done" means. All default to empty, so every
+    plan built before M1.3 is still valid and unchanged.
+    """
+
     action: ResearchPlanAction
     #: Why this runs: usually the gap it addresses.
     reason: str = ""
     gap_facet: KnowledgeFacet | None = None
     #: The tool that implements it, when one exists.
     tool: str = ""
+    #: Stable within one plan; dependencies refer to these.
+    step_id: str = ""
+    #: Step ids that must finish before this one may run.
+    depends_on: list[str] = Field(default_factory=list)
+    #: Arguments for `tool`, validated against its `ToolSpec` schema.
+    arguments: dict[str, Any] = Field(default_factory=dict)
+    #: What the step should produce, in a sentence.
+    expected_output: str = ""
+    #: When the step counts as done (`identity resolved`, `query answered`).
+    completion: str = ""
+    #: A second tool to try once if this one yields nothing or cannot run.
+    #: Declared by the plan author, validated like `tool`.
+    fallback_tool: str = ""
+    fallback_arguments: dict[str, Any] = Field(default_factory=dict)
 
 
 class ResearchPlan(BaseModel):
@@ -213,6 +241,9 @@ class ResearchPlan(BaseModel):
     #: Whether the user asked for the latest literature (§40). Detected
     #: deterministically from the question's own words, never assumed.
     wants_latest: bool = False
+    #: How many times the Planner changed the plan after it was created.
+    #: A revision is a decision with a reason, never a silent rewrite.
+    revision: int = 0
 
     def has(self, action: ResearchPlanAction) -> bool:
         return any(step.action is action for step in self.steps)
