@@ -163,6 +163,25 @@ class ResearchWorkflowError(CreaError):
         super().__init__(message or code)
 
 
+class GoldenCaseError(CreaError):
+    """A golden-case (evaluation infrastructure) operation failed, typed
+    by `code`.
+
+    `CASE_NOT_FOUND` / `CASE_EXISTS` / `CASE_VERSION_CONFLICT` /
+    `CASE_INPUT_MISSING` (no BlindInput for a run), `REFERENCE_NOT_FOUND`,
+    `TRACE_NOT_FOUND` / `TRACE_CASE_MISMATCH`, `EVALUATION_NOT_FOUND` /
+    `EVALUATION_VERSION_MISMATCH` (the verdict does not judge the trace's
+    case version), `UNSEAL_NOT_ALLOWED`, `CASE_RECORD_CORRUPT` (stored
+    JSON no longer reconstructs a model), `INVALID_INPUT`. Never a raw
+    sqlite3 or pydantic exception.
+    """
+
+    def __init__(self, code: str, message: str = "") -> None:
+        self.code = code
+        self.message = message
+        super().__init__(message or code)
+
+
 class ContextIntegrityError(CreaError):
     """An AI context would be structurally broken.
 

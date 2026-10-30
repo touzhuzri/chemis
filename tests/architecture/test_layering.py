@@ -245,6 +245,61 @@ def test_the_workbench_layers_stay_above_the_engine():
 
 
 # ---------------------------------------------------------------------------
+# M1.7.2: the evaluation layer orchestrates the agent and the golden-case
+# services; it never reaches storage, a provider or the sealed side on its
+# own, and the blind runner never names the unseal or content services.
+# ---------------------------------------------------------------------------
+
+
+def test_the_evaluation_layer_stays_above_the_agent_and_the_services():
+    """`evaluation/` runs blind cases: it may use core, the agent's
+    runtime and the golden-case store, and must never reach SQLite, a
+    provider, a transport, RDKit or the unseal/content services -- the
+    runner's isolation is an import boundary, not a promise."""
+    forbidden = (
+        "rdkit", "sqlite3", "crea.repositories.sqlite",
+        "crea.providers", "crea.sources", "crea.llm",
+        "golden_case_unseal", "reference_content",
+        "httpx", "requests", "openai", "anthropic",
+    )
+    for path in _python_files("evaluation"):
+        for name in _imports(path):
+            assert not any(name == f or name.startswith(f + ".")
+                           for f in forbidden), (
+                f"{path.name} imports {name}: the evaluation layer "
+                f"orchestrates the agent and the store, nothing else")
+
+
+def test_the_golden_case_services_reach_only_their_own_boundaries():
+    """The store, unseal and content services sit on the KB facade and
+    the models: no RDKit, no SQL, no provider, no agent -- unsealing is
+    a service rule, not an agent capability."""
+    forbidden = (
+        "rdkit", "sqlite3", "crea.repositories.sqlite", "crea.agent",
+        "crea.providers", "crea.sources", "httpx", "requests",
+    )
+    for rel in ("services/golden_case_store.py",
+                "services/golden_case_unseal.py",
+                "services/reference_content.py"):
+        for name in _imports(SRC / rel):
+            assert not any(name == f or name.startswith(f + ".")
+                           for f in forbidden), (
+                f"{rel} imports {name}")
+
+
+def test_the_blind_runner_never_imports_the_unseal_or_content_service():
+    """The runner cannot call what it cannot name: `crea.evaluation`
+    may import the agent view model and type the store in one
+    orchestration signature, but the unseal and content services stay
+    unnameable there."""
+    path = SRC / "evaluation" / "blind_runner.py"
+    imported = _imports(path)
+    for banned in ("crea.services.golden_case_unseal",
+                   "crea.services.reference_content"):
+        assert banned not in imported, f"blind_runner.py imports {banned}"
+
+
+# ---------------------------------------------------------------------------
 # CREA 4.0 Stage B-1 (§5/§8/§9/§11): the semantic layer's boundaries
 # ---------------------------------------------------------------------------
 

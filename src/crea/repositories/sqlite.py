@@ -112,6 +112,15 @@ from crea.core.models.study_context import (
     StudyHypothesis,
     UnresolvedIssue,
 )
+from crea.core.models.golden_case import (
+    EvaluationResult,
+    GoldenCase,
+    GoldenCaseStatus,
+    GoldenCaseType,
+    ReferenceMaterial,
+    ResearchTrace,
+)
+from crea.core.models.golden_case_access import UnsealEvent, UnsealOutcome
 from crea.core.models.workspace import Workspace, WorkspaceMessage
 from crea.core.provenance import Provenance, utc_now_iso
 from crea.repositories.errors import (
@@ -664,6 +673,67 @@ _SCHEMA_STATEMENTS = (
         created_at          TEXT NOT NULL,
         updated_at          TEXT NOT NULL,
         position            INTEGER NOT NULL
+    )""",
+    # -- golden cases (M1.7.2): the evaluation infrastructure. Cases,
+    #    references, traces, evaluations and unseal events live in their
+    #    own tables, keyed by case_id, with no foreign key into
+    #    research_studies: deleting or archiving a case can never touch a
+    #    study's data, and a study knows nothing about cases. Content_json
+    #    is the source of truth (the full model); scalar columns exist for
+    #    querying and are rewritten from the same object on every save, so
+    #    they cannot drift. Append-only where the domain demands it:
+    #    unseal events have INSERT and LIST and no update path at all.
+    """CREATE TABLE IF NOT EXISTS golden_cases (
+        case_id        TEXT PRIMARY KEY,
+        name           TEXT NOT NULL,
+        case_type      TEXT NOT NULL,
+        case_version   TEXT NOT NULL,
+        schema_version TEXT NOT NULL,
+        status         TEXT NOT NULL,
+        created_at     TEXT NOT NULL,
+        updated_at     TEXT NOT NULL,
+        content_json   TEXT NOT NULL,
+        position       INTEGER NOT NULL
+    )""",
+    """CREATE TABLE IF NOT EXISTS golden_case_references (
+        case_id       TEXT NOT NULL REFERENCES golden_cases(case_id) ON DELETE CASCADE,
+        reference_id  TEXT NOT NULL,
+        hidden        INTEGER NOT NULL DEFAULT 1,
+        content_json  TEXT NOT NULL,
+        position      INTEGER NOT NULL,
+        PRIMARY KEY (case_id, reference_id)
+    )""",
+    """CREATE TABLE IF NOT EXISTS golden_case_traces (
+        trace_id      TEXT PRIMARY KEY,
+        case_id       TEXT NOT NULL REFERENCES golden_cases(case_id) ON DELETE CASCADE,
+        case_version  TEXT NOT NULL,
+        session_id    TEXT NOT NULL DEFAULT '',
+        status        TEXT NOT NULL DEFAULT '',
+        content_json  TEXT NOT NULL,
+        position      INTEGER NOT NULL
+    )""",
+    """CREATE TABLE IF NOT EXISTS golden_case_evaluations (
+        evaluation_id      TEXT PRIMARY KEY,
+        case_id            TEXT NOT NULL REFERENCES golden_cases(case_id) ON DELETE CASCADE,
+        case_version       TEXT NOT NULL,
+        trace_id           TEXT NOT NULL,
+        evaluation_version TEXT NOT NULL,
+        content_json       TEXT NOT NULL,
+        position           INTEGER NOT NULL
+    )""",
+    """CREATE TABLE IF NOT EXISTS golden_case_unseal_events (
+        event_id         TEXT PRIMARY KEY,
+        case_id          TEXT NOT NULL REFERENCES golden_cases(case_id) ON DELETE CASCADE,
+        case_version     TEXT NOT NULL,
+        reference_id     TEXT NOT NULL,
+        outcome          TEXT NOT NULL,
+        actor            TEXT NOT NULL,
+        reason           TEXT NOT NULL,
+        previous_hidden  INTEGER NOT NULL,
+        new_hidden       INTEGER NOT NULL,
+        diagnostics      TEXT NOT NULL DEFAULT '',
+        at               TEXT NOT NULL,
+        position         INTEGER NOT NULL
     )""",
     # Standard DOI uniqueness (Stage 4.1 §26): one record per normalized DOI.
     # NULL DOIs are unlimited (a work with no DOI is still a record, §8), which
@@ -2465,6 +2535,213 @@ class SQLiteStore:
             user_selection_statement=r["user_selection_statement"],
             selected_at=r["selected_at"],
             created_at=r["created_at"]) for r in rows]
+
+    # -- golden cases (M1.7.2) ----------------------------------------------
+    #
+    # content_json is the source of truth for every record here; the scalar
+    # columns exist so queries can filter without parsing JSON, and they are
+    # rewritten from the same object on each save so they cannot drift. A
+    # row whose content_json no longer reconstructs its model raises
+    # TransactionError -- loudly, never a half-object.
+
+    def _golden_row_model(self, model_cls, raw, label: str):
+        try:
+            return model_cls.model_validate(load_json(raw))
+        except (ValueError, TypeError) as exc:  # json errors and ValidationError
+            raise TransactionError(
+                f"stored {label} record is not reconstructable: {exc}") from exc
+
+    def save_golden_case(self, case: GoldenCase) -> GoldenCase:
+        """Create a case. An existing case_id is a Duplicate, never a
+        silent overwrite -- identity is the caller's, collisions are news."""
+        self._execute(
+            "INSERT INTO golden_cases (case_id, name, case_type, "
+            "case_version, schema_version, status, created_at, updated_at, "
+            "content_json, position) VALUES (?,?,?,?,?,?,?,?,?,?)",
+            (case.case_id, case.name, case.case_type.value,
+             case.case_version, case.schema_version, case.status.value,
+             case.created_at, case.updated_at, _model_dump(case),
+             self._next_position("golden_cases")))
+        return case
+
+    def update_golden_case(self, case: GoldenCase) -> GoldenCase:
+        """Replace a stored case's content. NotFound when absent."""
+        cursor = self._execute(
+            "UPDATE golden_cases SET name=?, case_type=?, case_version=?, "
+            "schema_version=?, status=?, updated_at=?, content_json=? "
+            "WHERE case_id=?",
+            (case.name, case.case_type.value, case.case_version,
+             case.schema_version, case.status.value, case.updated_at,
+             _model_dump(case), case.case_id))
+        if cursor.rowcount == 0:
+            raise NotFound(f"no golden case {case.case_id!r}")
+        return case
+
+    def get_golden_case(self, case_id: str) -> GoldenCase | None:
+        rows = self._query(
+            "SELECT content_json FROM golden_cases WHERE case_id = ?",
+            (case_id,))
+        if not rows:
+            return None
+        return self._golden_row_model(GoldenCase, rows[0]["content_json"],
+                                      f"golden case {case_id!r}")
+
+    def list_golden_cases(self, *, case_type: GoldenCaseType | None = None,
+                          status: GoldenCaseStatus | None = None
+                          ) -> list[GoldenCase]:
+        sql = ("SELECT content_json FROM golden_cases "
+               "WHERE (? IS NULL OR case_type = ?) "
+               "AND (? IS NULL OR status = ?) ORDER BY position")
+        ct = case_type.value if case_type is not None else None
+        st = status.value if status is not None else None
+        rows = self._query(sql, (ct, ct, st, st))
+        return [self._golden_row_model(GoldenCase, r["content_json"],
+                                       "golden case") for r in rows]
+
+    def get_golden_case_version(self, case_id: str) -> str | None:
+        rows = self._query(
+            "SELECT case_version FROM golden_cases WHERE case_id = ?",
+            (case_id,))
+        return rows[0]["case_version"] if rows else None
+
+    def save_golden_case_reference(self, case_id: str,
+                                   material: ReferenceMaterial
+                                   ) -> ReferenceMaterial:
+        """Upsert one reference of one case.
+
+        The `hidden` column mirrors `material.hidden` from the same object
+        -- both written together, so they cannot disagree. Whether an
+        update is *allowed* to change `hidden` is the service layer's
+        rule, not this adapter's.
+        """
+        self._execute(
+            "INSERT INTO golden_case_references (case_id, reference_id, "
+            "hidden, content_json, position) VALUES (?,?,?,?,?) "
+            "ON CONFLICT(case_id, reference_id) DO UPDATE SET "
+            "hidden=excluded.hidden, content_json=excluded.content_json",
+            (case_id, material.reference_id, 1 if material.hidden else 0,
+             _model_dump(material),
+             self._next_position("golden_case_references", case_id)))
+        return material
+
+    def get_golden_case_reference(self, case_id: str,
+                                  reference_id: str) -> ReferenceMaterial | None:
+        rows = self._query(
+            "SELECT content_json FROM golden_case_references "
+            "WHERE case_id = ? AND reference_id = ?", (case_id, reference_id))
+        if not rows:
+            return None
+        return self._golden_row_model(ReferenceMaterial,
+                                      rows[0]["content_json"], "reference")
+
+    def list_golden_case_references(self, case_id: str
+                                    ) -> list[ReferenceMaterial]:
+        rows = self._query(
+            "SELECT content_json FROM golden_case_references "
+            "WHERE case_id = ? ORDER BY position", (case_id,))
+        return [self._golden_row_model(ReferenceMaterial, r["content_json"],
+                                       "reference") for r in rows]
+
+    def save_golden_case_trace(self, trace: ResearchTrace) -> ResearchTrace:
+        self._execute(
+            "INSERT INTO golden_case_traces (trace_id, case_id, "
+            "case_version, session_id, status, content_json, position) "
+            "VALUES (?,?,?,?,?,?,?) "
+            "ON CONFLICT(trace_id) DO UPDATE SET "
+            "content_json=excluded.content_json, status=excluded.status",
+            (trace.trace_id, trace.case_id, trace.case_version,
+             trace.session_id, trace.status.value, _model_dump(trace),
+             self._next_position("golden_case_traces")))
+        return trace
+
+    def get_golden_case_trace(self, trace_id: str) -> ResearchTrace | None:
+        rows = self._query(
+            "SELECT content_json FROM golden_case_traces WHERE trace_id = ?",
+            (trace_id,))
+        if not rows:
+            return None
+        return self._golden_row_model(ResearchTrace, rows[0]["content_json"],
+                                      "trace")
+
+    def list_golden_case_traces(self, case_id: str) -> list[ResearchTrace]:
+        rows = self._query(
+            "SELECT content_json FROM golden_case_traces WHERE case_id = ? "
+            "ORDER BY position", (case_id,))
+        return [self._golden_row_model(ResearchTrace, r["content_json"],
+                                       "trace") for r in rows]
+
+    def save_golden_case_evaluation(self, result: EvaluationResult
+                                    ) -> EvaluationResult:
+        self._execute(
+            "INSERT INTO golden_case_evaluations (evaluation_id, case_id, "
+            "case_version, trace_id, evaluation_version, content_json, "
+            "position) VALUES (?,?,?,?,?,?,?) "
+            "ON CONFLICT(evaluation_id) DO UPDATE SET "
+            "content_json=excluded.content_json",
+            (result.evaluation_id, result.case_id, result.case_version,
+             result.trace_id, result.evaluation_version, _model_dump(result),
+             self._next_position("golden_case_evaluations")))
+        return result
+
+    def get_golden_case_evaluation(self, evaluation_id: str
+                                   ) -> EvaluationResult | None:
+        rows = self._query(
+            "SELECT content_json FROM golden_case_evaluations "
+            "WHERE evaluation_id = ?", (evaluation_id,))
+        if not rows:
+            return None
+        return self._golden_row_model(EvaluationResult, rows[0]["content_json"],
+                                      "evaluation")
+
+    def list_golden_case_evaluations(self, case_id: str
+                                     ) -> list[EvaluationResult]:
+        rows = self._query(
+            "SELECT content_json FROM golden_case_evaluations "
+            "WHERE case_id = ? ORDER BY position", (case_id,))
+        return [self._golden_row_model(EvaluationResult, r["content_json"],
+                                       "evaluation") for r in rows]
+
+    def save_unseal_event(self, event: UnsealEvent) -> UnsealEvent:
+        """Append one audit event. There is no update and no delete: the
+        history of who opened what is not a mutable field."""
+        self._execute(
+            "INSERT INTO golden_case_unseal_events (event_id, case_id, "
+            "case_version, reference_id, outcome, actor, reason, "
+            "previous_hidden, new_hidden, diagnostics, at, position) "
+            "VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
+            (event.event_id, event.case_id, event.case_version,
+             event.reference_id, event.outcome.value, event.actor,
+             event.reason, 1 if event.previous_hidden else 0,
+             1 if event.new_hidden else 0, event.diagnostics, event.at,
+             self._next_position("golden_case_unseal_events")))
+        return event
+
+    def list_unseal_events(self, case_id: str, *,
+                           reference_id: str | None = None
+                           ) -> list[UnsealEvent]:
+        rows = self._query(
+            "SELECT * FROM golden_case_unseal_events "
+            "WHERE case_id = ? AND (? IS NULL OR reference_id = ?) "
+            "ORDER BY position", (case_id, reference_id, reference_id))
+        return [UnsealEvent(
+            event_id=r["event_id"], case_id=case_id,
+            case_version=r["case_version"], reference_id=r["reference_id"],
+            outcome=UnsealOutcome(r["outcome"]), actor=r["actor"],
+            reason=r["reason"], previous_hidden=bool(r["previous_hidden"]),
+            new_hidden=bool(r["new_hidden"]), diagnostics=r["diagnostics"],
+            at=r["at"]) for r in rows]
+
+    def _next_position(self, table: str, where_value: str | None = None
+                       ) -> int:
+        """Next append position in a table (optionally scoped by case_id)."""
+        if where_value is None:
+            rows = self._query(
+                f"SELECT COALESCE(MAX(position), 0) + 1 AS next FROM {table}")
+        else:
+            rows = self._query(
+                f"SELECT COALESCE(MAX(position), 0) + 1 AS next "
+                f"FROM {table} WHERE case_id = ?", (where_value,))
+        return rows[0]["next"]
 
     # -- research workflows (Stage 7.2) -------------------------------------
 

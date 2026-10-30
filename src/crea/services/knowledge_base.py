@@ -271,6 +271,58 @@ class KnowledgeBase:
     def list_identity_records(self, study_id: str):
         return self._store.list_identity_records(study_id)
 
+    # -- golden cases (M1.7.2) ----------------------------------------------
+
+    def save_golden_case(self, case):
+        return self._store.save_golden_case(case)
+
+    def update_golden_case(self, case):
+        return self._store.update_golden_case(case)
+
+    def get_golden_case(self, case_id: str):
+        return self._store.get_golden_case(case_id)
+
+    def list_golden_cases(self, *, case_type=None, status=None):
+        return self._store.list_golden_cases(case_type=case_type,
+                                             status=status)
+
+    def get_golden_case_version(self, case_id: str):
+        return self._store.get_golden_case_version(case_id)
+
+    def save_golden_case_reference(self, case_id: str, material):
+        return self._store.save_golden_case_reference(case_id, material)
+
+    def get_golden_case_reference(self, case_id: str, reference_id: str):
+        return self._store.get_golden_case_reference(case_id, reference_id)
+
+    def list_golden_case_references(self, case_id: str):
+        return self._store.list_golden_case_references(case_id)
+
+    def save_golden_case_trace(self, trace):
+        return self._store.save_golden_case_trace(trace)
+
+    def get_golden_case_trace(self, trace_id: str):
+        return self._store.get_golden_case_trace(trace_id)
+
+    def list_golden_case_traces(self, case_id: str):
+        return self._store.list_golden_case_traces(case_id)
+
+    def save_golden_case_evaluation(self, result):
+        return self._store.save_golden_case_evaluation(result)
+
+    def get_golden_case_evaluation(self, evaluation_id: str):
+        return self._store.get_golden_case_evaluation(evaluation_id)
+
+    def list_golden_case_evaluations(self, case_id: str):
+        return self._store.list_golden_case_evaluations(case_id)
+
+    def save_unseal_event(self, event):
+        return self._store.save_unseal_event(event)
+
+    def list_unseal_events(self, case_id: str, *, reference_id=None):
+        return self._store.list_unseal_events(case_id,
+                                              reference_id=reference_id)
+
     # -- research workflows (Stage 7.2) -------------------------------------
 
     def save_workflow(self, workflow):
