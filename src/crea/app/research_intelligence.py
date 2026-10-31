@@ -1,4 +1,4 @@
-"""The AI Research Intelligence's product entry (M2.0).
+"""The AI Research Intelligence's product entry (M2.0, revised M2.0.1).
 
 One use case, four moves: start a research question, read what it is doing,
 answer the question it paused on, and read the report. Everything the
@@ -12,10 +12,15 @@ What this layer adds on top of `ResearchIntelligence` itself:
   `ResearchStudy` and points a `StudyContextService` at it, so facts,
   hypotheses, decisions and open issues survive the run and the next
   session starts from them.
+* **An audit trail that outlives the process (M2.0.1).** Every turn and
+  the run's terminal summary are persisted through a
+  `ResearchTraceService` while the store is open, so `get`,
+  `decisions`, `report` and `live_result` answer for a session started
+  by an earlier process just as they do for one in memory. What a
+  restart still loses is the ability to *continue a pause*: `answer`
+  and `cancel` need the live run and say so.
 * **A handle to come back to.** A paused run is kept in memory keyed by
-  its session id so the caller can answer it. The decisions themselves are
-  already persisted by the study context, so a restart loses the ability
-  to *resume a pause in this process* but never the audit trail.
+  its session id so the caller can answer it.
 * **Redaction.** Everything returned goes through the project's own
   credential redaction before it leaves this layer.
 """
@@ -56,6 +61,10 @@ class ResearchIntelligenceApplication:
     #: Per-run budget overrides, applied when the caller does not pass one.
     budget: Any = None
     _runs: dict[str, _LiveRun] = field(default_factory=dict, repr=False)
+    #: Audit-trail rebuilds from the database, keyed by session id. A
+    #: rebuilt result is readable but not continuable -- it never enters
+    #: `_runs`, so `answer` cannot mistake it for a live pause.
+    _loaded: dict[str, Any] = field(default_factory=dict, repr=False)
 
     # -- start --------------------------------------------------------------
 
@@ -82,6 +91,7 @@ class ResearchIntelligenceApplication:
         llm = self._llm()
 
         from crea.agent.intelligence import ResearchIntelligence
+        from crea.services.research_trace import ResearchTraceService
 
         registry, library, sink = self.stack_factory(
             document_ids=list(document_ids or []))
@@ -90,7 +100,9 @@ class ResearchIntelligenceApplication:
         try:
             intelligence = ResearchIntelligence(
                 registry, llm, study_context=context, study_id=study_id,
-                budget=budget or self.budget)
+                budget=budget or self.budget,
+                trace_sink=(ResearchTraceService(kb)
+                            if kb is not None else None))
             result = intelligence.run(goal, approvals=approvals)
         finally:
             # The store handle belongs to this request. A later `answer`
@@ -104,27 +116,39 @@ class ResearchIntelligenceApplication:
     # -- inspect ------------------------------------------------------------
 
     def get(self, session_id: str) -> dict:
-        """The last known state of one run in this process."""
-        return self.serialize(self._require(session_id).result)
+        """The last known state of one run -- in this process, or, after a
+        restart, rebuilt from the persisted audit trail."""
+        return self.serialize(self._readable(session_id))
 
     def decisions(self, session_id: str) -> list[dict]:
-        """Every turn of one run, accepted or not -- the audit trail."""
-        run = self._require(session_id)
+        """Every turn of one run, accepted or not -- the audit trail.
+
+        Reads the in-memory run when this process started it and the
+        persisted trail otherwise; both are the same `DecisionRecord`s.
+        """
+        result = self._readable(session_id)
         return [redact(record.model_dump(mode="json"))
-                for record in run.result.decision_records]
+                for record in result.decision_records]
 
     def report(self, session_id: str) -> str:
-        """The run rendered as a readable, epistemically honest report."""
-        return render_intelligence_report(self._require(session_id).result)
+        """The run rendered as a readable, epistemically honest report.
+
+        Renderable from any process that can open the database: the
+        trail carries the observations, interpretations and stop reason
+        the report reads. Rendering a report does not resume a run.
+        """
+        return render_intelligence_report(self._readable(session_id))
 
     def live_result(self, session_id: str) -> Any:
         """The `IntelligenceRunResult` itself, for a caller that renders.
 
         A CLI wants the object, not a dict: `render_intelligence_report`
         reads the model's own fields and keeps the epistemic categories
-        apart. The HTTP layer wants `serialize` instead.
+        apart. The HTTP layer wants `serialize` instead. After a restart
+        the object is rebuilt from the audit trail -- readable in every
+        field the report uses, but carrying no live intelligence.
         """
-        return self._require(session_id).result
+        return self._readable(session_id)
 
     # -- answer / cancel ----------------------------------------------------
 
@@ -141,9 +165,14 @@ class ResearchIntelligenceApplication:
                 "NOT_AWAITING_INPUT",
                 f"session {session_id!r} is not waiting for an answer "
                 f"(outcome: {run.result.outcome})")
+        from crea.services.research_trace import ResearchTraceService
+
         context, kb = self._open_study(run.study_id, run.goal)
         try:
-            result = run.intelligence.with_study_context(context).resume(
+            result = run.intelligence.with_study_context(
+                context,
+                trace_sink=(ResearchTraceService(kb)
+                            if kb is not None else None)).resume(
                 run.result, answers=answers, approvals=approvals)
         finally:
             _close_kb(kb)
@@ -266,14 +295,62 @@ class ResearchIntelligenceApplication:
         return context, kb
 
     def _require(self, session_id: str) -> _LiveRun:
+        """The live run, only. `answer`/`cancel` use this: continuing a
+        pause needs the intelligence instance that owns it, and a rebuilt
+        audit record does not have one."""
         run = self._runs.get(session_id)
         if run is None:
             raise ResearchStudyError(
                 "SESSION_NOT_FOUND",
-                f"no research session {session_id!r} in this process; a "
-                f"paused run can only be answered by the process that "
-                f"started it")
+                f"no live research session {session_id!r} in this process; "
+                f"a paused run can only be answered by the process that "
+                f"started it (its audit trail, if any, is still readable)")
         return run
+
+    def _readable(self, session_id: str) -> Any:
+        """The run's result for reading: live when here, else rebuilt.
+
+        The rebuild is an audit view, not a task: it answers `get`,
+        `decisions`, `report` and `live_result` with the same records the
+        original process would show, and is cached per process so a
+        repeated read does not re-query. It is never placed in `_runs`,
+        so `answer` still refuses it with SESSION_NOT_FOUND. A session
+        that exists in neither place is the same typed error as before.
+        """
+        run = self._runs.get(session_id)
+        if run is not None:
+            return run.result
+        cached = self._loaded.get(session_id)
+        if cached is not None:
+            return cached
+        rebuilt = self._load_from_trace(session_id)
+        if rebuilt is None:
+            raise ResearchStudyError(
+                "SESSION_NOT_FOUND",
+                f"no research session {session_id!r} in this process or "
+                f"its persisted audit trail")
+        self._loaded[session_id] = rebuilt
+        return rebuilt
+
+    def _load_from_trace(self, session_id: str) -> Any:
+        """Rebuild one run from the persisted audit trail, or None."""
+        from crea.agent.intelligence import run_result_from_trace
+        from crea.services.research_trace import ResearchTraceService
+
+        kb = _open_kb(self.db_path)
+        if kb is None:
+            return None
+        try:
+            service = ResearchTraceService(kb)
+            run_row = service.find_run(session_id)
+            if run_row is None:
+                return None
+            turns = service.turns(run_row.study_id, session_id)
+            return run_result_from_trace(run_row, turns)
+        except ResearchStudyError:
+            return None
+        finally:
+            _close_kb(kb)
 
     @staticmethod
     def _new_study_id(goal: str) -> str:

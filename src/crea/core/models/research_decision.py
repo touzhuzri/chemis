@@ -47,8 +47,10 @@ from crea.core.provenance import utc_now_iso
 RESEARCH_DECISION_SCHEMA_VERSION = "research-decision-v1"
 
 #: The prompt contract a run was made under. Bump when the system prompt's
-#: instructions change what a good decision looks like.
-INTELLIGENCE_PROMPT_VERSION = "m2.0-intelligence-1"
+#: instructions change what a good decision looks like. m2.0-intelligence-2
+#: (M2.0.1): the state document is budgeted by priority -- observations
+#: outrank the tool catalog -- and `context_budget` reports the accounting.
+INTELLIGENCE_PROMPT_VERSION = "m2.0-intelligence-2"
 
 
 class DecisionKind(str, Enum):
@@ -269,6 +271,11 @@ class DecisionRecord(BaseModel):
     associated_step_id: str = ""
     #: The full accepted decision, so a reader can re-check the gate.
     decision: ResearchDecision | None = None
+    #: The prompt-budget accounting this turn was made under (M2.0.1):
+    #: per-section character usage, catalog mode and what was omitted.
+    #: Present when the loop rendered a budgeted state; absent on records
+    #: produced before M2.0.1.
+    context_budget: dict | None = None
 
 
 class ScientificInterpretation(BaseModel):

@@ -112,6 +112,10 @@ from crea.core.models.study_context import (
     StudyHypothesis,
     UnresolvedIssue,
 )
+from crea.core.models.research_trace import (
+    ResearchRunTrace,
+    ResearchTurnTrace,
+)
 from crea.core.models.golden_case import (
     EvaluationResult,
     GoldenCase,
@@ -177,9 +181,26 @@ def dump_json(value) -> str:
 #: provider tokens, Authorization headers, API keys. Provenance params are
 #: caller-controlled free-form, so they are scrubbed on the way in -- a
 #: redaction beats a leaked bearer token in an export.
+#:
+#: Credential words match as whole segments of the key, not substrings:
+#: `input_tokens` and `max_output_tokens` are *counts* (M2.0.1 stores them
+#: on the audit trail), and a redacted count is not an integer. A key that
+#: is or ends in a credential word -- `token`, `refresh_token`,
+#: `Authorization` -- is still scrubbed, and the API-key spellings still
+#: match anywhere in the key.
+_SECRET_WORDS = frozenset({
+    "authorization", "token", "secret", "password", "credential",
+    "bearer", "cookie",
+})
 _SECRET_KEY_RE = re.compile(
-    r"(authorization|api[-_]?key|apikey|token|secret|password|credential"
-    r"|bearer|cookie|set-cookie)", re.IGNORECASE)
+    r"(api[-_]?key|apikey|set-cookie)", re.IGNORECASE)
+
+
+def _is_secret_key(key: str) -> bool:
+    if _SECRET_KEY_RE.search(key):
+        return True
+    segments = [s for s in re.split(r"[^a-z0-9]+", key.lower()) if s]
+    return any(s in _SECRET_WORDS for s in segments)
 
 
 def scrub(value):
@@ -187,7 +208,7 @@ def scrub(value):
     if isinstance(value, dict):
         out = {}
         for key, item in value.items():
-            if isinstance(key, str) and _SECRET_KEY_RE.search(key):
+            if isinstance(key, str) and _is_secret_key(key):
                 out[key] = "[REDACTED]"
             else:
                 out[key] = scrub(item)
@@ -201,6 +222,42 @@ def load_json(text: str | None):
     if not text:
         return None
     return json.loads(text)
+
+
+def _run_trace_from_row(r) -> "ResearchRunTrace":
+    """One `ai_research_runs` row as its model. Tolerant of foreign JSON:
+    a column that will not parse becomes the neutral default, never a
+    crash and never a guessed value."""
+    def parsed(key, default):
+        try:
+            value = load_json(r[key])
+        except (ValueError, TypeError):
+            return default
+        return default if value is None else value
+
+    return ResearchRunTrace(
+        study_id=r["study_id"], session_id=r["session_id"],
+        goal=r["goal"], mode=r["mode"], status=r["status"],
+        outcome=r["outcome"], reason=r["reason"],
+        started_at=r["started_at"], ended_at=r["ended_at"],
+        duration_ms=r["duration_ms"], cancelled=bool(r["cancelled"]),
+        model_provider=r["model_provider"], model_name=r["model_name"],
+        prompt_version=r["prompt_version"],
+        schema_version=r["schema_version"],
+        budget=parsed("budget_json", {}),
+        decisions_used=r["decisions_used"],
+        tool_calls_used=r["tool_calls_used"],
+        model_calls_used=r["model_calls_used"],
+        input_tokens=r["input_tokens"], output_tokens=r["output_tokens"],
+        evidence_ids=parsed("evidence_ids_json", []),
+        hypothesis_ids=parsed("hypothesis_ids_json", []),
+        unresolved_items=parsed("unresolved_json", []),
+        failures=parsed("failures_json", []),
+        diagnostics=parsed("diagnostics_json", []),
+        awaiting=parsed("awaiting_json", None),
+        completion=parsed("completion_json", None),
+        blocked=parsed("blocked_json", None),
+        record_count=r["record_count"], updated_at=r["updated_at"])
 
 
 # ---------------------------------------------------------------------------
@@ -647,6 +704,66 @@ _SCHEMA_STATEMENTS = (
         created_at               TEXT NOT NULL,
         position                 INTEGER NOT NULL,
         PRIMARY KEY (study_id, record_id)
+    )""",
+    # -- AI research audit trace (M2.0.1): the DecisionRecord trail of one
+    #    AI research session, plus its run summary, so a second process can
+    #    read and re-render the audit after the first one exited. Additive
+    #    -- schema version stays v1; initialize() creates these on an
+    #    existing v1 database exactly as it did for the study-context
+    #    tables. Turns are keyed by decision_id with an append position, so
+    #    a resumed session appends rather than colliding, and a re-write of
+    #    the same turn upserts instead of duplicating. Content is scrubbed
+    #    on the way in (§87/§88): no credential reaches these rows.
+    """CREATE TABLE IF NOT EXISTS ai_research_runs (
+        study_id          TEXT NOT NULL REFERENCES research_studies(study_id) ON DELETE CASCADE,
+        session_id        TEXT NOT NULL,
+        goal              TEXT NOT NULL DEFAULT '',
+        mode              TEXT NOT NULL DEFAULT '',
+        status            TEXT NOT NULL DEFAULT '',
+        outcome           TEXT NOT NULL DEFAULT '',
+        reason            TEXT NOT NULL DEFAULT '',
+        started_at        TEXT NOT NULL DEFAULT '',
+        ended_at          TEXT NOT NULL DEFAULT '',
+        duration_ms       INTEGER NOT NULL DEFAULT 0,
+        cancelled         INTEGER NOT NULL DEFAULT 0,
+        model_provider    TEXT NOT NULL DEFAULT '',
+        model_name        TEXT NOT NULL DEFAULT '',
+        prompt_version    TEXT NOT NULL DEFAULT '',
+        schema_version    TEXT NOT NULL DEFAULT '',
+        budget_json       TEXT NOT NULL DEFAULT '{}',
+        decisions_used    INTEGER NOT NULL DEFAULT 0,
+        tool_calls_used   INTEGER NOT NULL DEFAULT 0,
+        model_calls_used  INTEGER NOT NULL DEFAULT 0,
+        input_tokens      INTEGER,
+        output_tokens     INTEGER,
+        evidence_ids_json TEXT NOT NULL DEFAULT '[]',
+        hypothesis_ids_json TEXT NOT NULL DEFAULT '[]',
+        unresolved_json   TEXT NOT NULL DEFAULT '[]',
+        failures_json     TEXT NOT NULL DEFAULT '[]',
+        diagnostics_json  TEXT NOT NULL DEFAULT '[]',
+        awaiting_json     TEXT,
+        completion_json   TEXT,
+        blocked_json      TEXT,
+        record_count      INTEGER NOT NULL DEFAULT 0,
+        updated_at        TEXT NOT NULL DEFAULT '',
+        PRIMARY KEY (study_id, session_id)
+    )""",
+    """CREATE TABLE IF NOT EXISTS ai_research_turns (
+        study_id             TEXT NOT NULL REFERENCES research_studies(study_id) ON DELETE CASCADE,
+        session_id           TEXT NOT NULL,
+        decision_id          TEXT NOT NULL,
+        position             INTEGER NOT NULL,
+        turn                 INTEGER NOT NULL,
+        record_json          TEXT NOT NULL,
+        step_id              TEXT NOT NULL DEFAULT '',
+        tool_name            TEXT NOT NULL DEFAULT '',
+        arguments_json       TEXT NOT NULL DEFAULT '{}',
+        step_json            TEXT,
+        tool_result_json     TEXT,
+        observation_json     TEXT,
+        interpretation_json  TEXT,
+        created_at           TEXT NOT NULL DEFAULT '',
+        PRIMARY KEY (study_id, session_id, decision_id)
     )""",
     # -- research workflows (Stage 7.2): a bounded task set over a session.
     #    Tasks reference artifacts by id; they never copy results.
@@ -2535,6 +2652,197 @@ class SQLiteStore:
             user_selection_statement=r["user_selection_statement"],
             selected_at=r["selected_at"],
             created_at=r["created_at"]) for r in rows]
+
+    # -- AI research audit trace (M2.0.1) ------------------------------------
+    #
+    # One row per audited turn, one row per run summary, both keyed by
+    # study first. The turn row upserts on (study, session, decision_id):
+    # a re-write of the same turn (same decision id) refreshes the row in
+    # place and keeps its append position, so a repeated call can never
+    # duplicate the audit trail, and a resumed session appends new
+    # decision ids after the old ones. All JSON goes through scrub(): a
+    # credential-looking key never reaches these tables (§87/§88).
+
+    def save_ai_research_turn(self, study_id: str,
+                              trace: ResearchTurnTrace) -> ResearchTurnTrace:
+        existing = self._query(
+            "SELECT position FROM ai_research_turns "
+            "WHERE study_id = ? AND session_id = ? AND decision_id = ?",
+            (study_id, trace.session_id, trace.decision_id))
+        if existing:
+            position = existing[0]["position"]
+        else:
+            rows = self._query(
+                "SELECT COALESCE(MAX(position), 0) + 1 AS next "
+                "FROM ai_research_turns WHERE study_id = ? AND session_id = ?",
+                (study_id, trace.session_id))
+            position = rows[0]["next"]
+        self._execute(
+            "INSERT INTO ai_research_turns (study_id, session_id, "
+            "decision_id, position, turn, record_json, step_id, tool_name, "
+            "arguments_json, step_json, tool_result_json, observation_json, "
+            "interpretation_json, created_at) "
+            "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?) "
+            "ON CONFLICT(study_id, session_id, decision_id) DO UPDATE SET "
+            "turn=excluded.turn, record_json=excluded.record_json, "
+            "step_id=excluded.step_id, tool_name=excluded.tool_name, "
+            "arguments_json=excluded.arguments_json, "
+            "step_json=excluded.step_json, "
+            "tool_result_json=excluded.tool_result_json, "
+            "observation_json=excluded.observation_json, "
+            "interpretation_json=excluded.interpretation_json",
+            (study_id, trace.session_id, trace.decision_id, position,
+             trace.turn,
+             dump_json(scrub(trace.record.model_dump(mode="json"))),
+             trace.step_id, trace.tool_name,
+             dump_json(scrub(trace.arguments)),
+             dump_json(scrub(trace.step.model_dump(mode="json")))
+             if trace.step is not None else None,
+             dump_json(scrub(trace.tool_result.model_dump(mode="json")))
+             if trace.tool_result is not None else None,
+             dump_json(scrub(trace.observation))
+             if trace.observation is not None else None,
+             dump_json(scrub(trace.interpretation.model_dump(mode="json")))
+             if trace.interpretation is not None else None,
+             trace.created_at))
+        return trace.model_copy(update={"position": position})
+
+    def list_ai_research_turns(self, study_id: str,
+                               session_id: str) -> list[ResearchTurnTrace]:
+        from crea.core.models.research import ResearchStep, ToolResult
+        from crea.core.models.research_decision import (
+            DecisionRecord,
+            ScientificInterpretation,
+        )
+
+        rows = self._query(
+            "SELECT * FROM ai_research_turns "
+            "WHERE study_id = ? AND session_id = ? "
+            "ORDER BY position, turn", (study_id, session_id))
+        out: list[ResearchTurnTrace] = []
+        for r in rows:
+            try:
+                record = DecisionRecord.model_validate(load_json(r["record_json"]))
+            except (ValueError, TypeError):
+                continue  # a foreign row is skipped, never guessed at
+            step = None
+            if r["step_json"]:
+                try:
+                    step = ResearchStep.model_validate(load_json(r["step_json"]))
+                except (ValueError, TypeError):
+                    step = None
+            tool_result = None
+            if r["tool_result_json"]:
+                try:
+                    tool_result = ToolResult.model_validate(
+                        load_json(r["tool_result_json"]))
+                except (ValueError, TypeError):
+                    tool_result = None
+            interpretation = None
+            if r["interpretation_json"]:
+                try:
+                    interpretation = ScientificInterpretation.model_validate(
+                        load_json(r["interpretation_json"]))
+                except (ValueError, TypeError):
+                    interpretation = None
+            out.append(ResearchTurnTrace(
+                study_id=study_id, session_id=session_id,
+                turn=r["turn"], decision_id=r["decision_id"],
+                position=r["position"], created_at=r["created_at"],
+                record=record, step=step, step_id=r["step_id"],
+                tool_name=r["tool_name"],
+                arguments=load_json(r["arguments_json"]) or {},
+                tool_result=tool_result,
+                observation=load_json(r["observation_json"]),
+                interpretation=interpretation))
+        return out
+
+    def save_ai_research_run(self, study_id: str,
+                             run: ResearchRunTrace) -> ResearchRunTrace:
+        """Upsert the run summary. One row per (study, session): the latest
+        terminal state of that session's most recent segment."""
+        self._execute(
+            "INSERT INTO ai_research_runs (study_id, session_id, goal, mode, "
+            "status, outcome, reason, started_at, ended_at, duration_ms, "
+            "cancelled, model_provider, model_name, prompt_version, "
+            "schema_version, budget_json, decisions_used, tool_calls_used, "
+            "model_calls_used, input_tokens, output_tokens, "
+            "evidence_ids_json, hypothesis_ids_json, unresolved_json, "
+            "failures_json, diagnostics_json, awaiting_json, "
+            "completion_json, blocked_json, record_count, updated_at) "
+            "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?) "
+            "ON CONFLICT(study_id, session_id) DO UPDATE SET "
+            "goal=excluded.goal, mode=excluded.mode, status=excluded.status, "
+            "outcome=excluded.outcome, reason=excluded.reason, "
+            "started_at=excluded.started_at, ended_at=excluded.ended_at, "
+            "duration_ms=excluded.duration_ms, cancelled=excluded.cancelled, "
+            "model_provider=excluded.model_provider, "
+            "model_name=excluded.model_name, "
+            "prompt_version=excluded.prompt_version, "
+            "schema_version=excluded.schema_version, "
+            "budget_json=excluded.budget_json, "
+            "decisions_used=excluded.decisions_used, "
+            "tool_calls_used=excluded.tool_calls_used, "
+            "model_calls_used=excluded.model_calls_used, "
+            "input_tokens=excluded.input_tokens, "
+            "output_tokens=excluded.output_tokens, "
+            "evidence_ids_json=excluded.evidence_ids_json, "
+            "hypothesis_ids_json=excluded.hypothesis_ids_json, "
+            "unresolved_json=excluded.unresolved_json, "
+            "failures_json=excluded.failures_json, "
+            "diagnostics_json=excluded.diagnostics_json, "
+            "awaiting_json=excluded.awaiting_json, "
+            "completion_json=excluded.completion_json, "
+            "blocked_json=excluded.blocked_json, "
+            "record_count=excluded.record_count, "
+            "updated_at=excluded.updated_at",
+            (study_id, run.session_id, run.goal, run.mode, run.status,
+             run.outcome, run.reason, run.started_at, run.ended_at,
+             run.duration_ms, 1 if run.cancelled else 0,
+             run.model_provider, run.model_name, run.prompt_version,
+             run.schema_version,
+             dump_json(scrub(run.budget)),
+             run.decisions_used, run.tool_calls_used, run.model_calls_used,
+             run.input_tokens, run.output_tokens,
+             dump_json(run.evidence_ids), dump_json(run.hypothesis_ids),
+             dump_json(run.unresolved_items), dump_json(run.failures),
+             dump_json(scrub(run.diagnostics)),
+             dump_json(scrub(run.awaiting)) if run.awaiting is not None
+             else None,
+             dump_json(scrub(run.completion)) if run.completion is not None
+             else None,
+             dump_json(scrub(run.blocked)) if run.blocked is not None
+             else None,
+             run.record_count, run.updated_at))
+        return run
+
+    def get_ai_research_run(self, study_id: str,
+                            session_id: str) -> ResearchRunTrace | None:
+        rows = self._query(
+            "SELECT * FROM ai_research_runs "
+            "WHERE study_id = ? AND session_id = ?",
+            (study_id, session_id))
+        return _run_trace_from_row(rows[0]) if rows else None
+
+    def find_ai_research_run(self, session_id: str) -> ResearchRunTrace | None:
+        """The run summary for one session id, across studies.
+
+        A session id is a content hash minted per run and handed to the
+        caller as the handle for exactly this lookup -- the same access
+        the in-process entry already had. This is an audit door, not a
+        search: there is still no way to enumerate another study's
+        sessions through it.
+        """
+        rows = self._query(
+            "SELECT * FROM ai_research_runs WHERE session_id = ? "
+            "ORDER BY updated_at DESC LIMIT 1", (session_id,))
+        return _run_trace_from_row(rows[0]) if rows else None
+
+    def list_ai_research_runs(self, study_id: str) -> list[ResearchRunTrace]:
+        rows = self._query(
+            "SELECT * FROM ai_research_runs WHERE study_id = ? "
+            "ORDER BY updated_at", (study_id,))
+        return [_run_trace_from_row(r) for r in rows]
 
     # -- golden cases (M1.7.2) ----------------------------------------------
     #

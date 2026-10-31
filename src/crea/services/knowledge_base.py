@@ -271,6 +271,26 @@ class KnowledgeBase:
     def list_identity_records(self, study_id: str):
         return self._store.list_identity_records(study_id)
 
+    # -- AI research audit trace (M2.0.1) -----------------------------------
+
+    def save_ai_research_turn(self, study_id: str, turn):
+        return self._store.save_ai_research_turn(study_id, turn)
+
+    def list_ai_research_turns(self, study_id: str, session_id: str):
+        return self._store.list_ai_research_turns(study_id, session_id)
+
+    def save_ai_research_run(self, study_id: str, run):
+        return self._store.save_ai_research_run(study_id, run)
+
+    def get_ai_research_run(self, study_id: str, session_id: str):
+        return self._store.get_ai_research_run(study_id, session_id)
+
+    def find_ai_research_run(self, session_id: str):
+        return self._store.find_ai_research_run(session_id)
+
+    def list_ai_research_runs(self, study_id: str):
+        return self._store.list_ai_research_runs(study_id)
+
     # -- golden cases (M1.7.2) ----------------------------------------------
 
     def save_golden_case(self, case):

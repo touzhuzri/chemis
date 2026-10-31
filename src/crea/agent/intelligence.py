@@ -68,11 +68,16 @@ from crea.core.models.research import (
 from crea.core.models.research_decision import (
     INTELLIGENCE_PROMPT_VERSION,
     BlockedStatement,
+    CompletionStatement,
     DecisionKind,
     DecisionOutcome,
     DecisionRecord,
     ResearchDecision,
     ScientificInterpretation,
+)
+from crea.core.models.research_trace import (
+    ResearchRunTrace,
+    ResearchTurnTrace,
 )
 from crea.core.models.research_intent import (
     EntityIdentityStatus,
@@ -522,7 +527,8 @@ class ResearchIntelligence:
                  study_context: Any = None, study_id: str = "",
                  budget: ResearchBudget | None = None,
                  validator: DecisionValidator | None = None,
-                 temperature: float = 0.0) -> None:
+                 temperature: float = 0.0,
+                 trace_sink: Any = None) -> None:
         self._registry = registry
         self._llm = llm
         self._study_context = study_context
@@ -532,6 +538,12 @@ class ResearchIntelligence:
                            else DecisionValidator(registry))
         self._temperature = temperature
         self._cancelled = False
+        #: Where the audit trail is persisted (M2.0.1). Duck-typed:
+        #: `record_turn(ResearchTurnTrace)` after every turn,
+        #: `record_run(ResearchRunTrace)` once at the end. None means no
+        #: persistence -- a scripted test or a golden-case run does not
+        #: need one, and the in-memory result is unchanged either way.
+        self._trace_sink = trace_sink
 
     # -- public API ---------------------------------------------------------
 
@@ -545,15 +557,20 @@ class ResearchIntelligence:
         """
         self._cancelled = True
 
-    def with_study_context(self, service: Any) -> "ResearchIntelligence":
+    def with_study_context(self, service: Any, *,
+                           trace_sink: Any = None) -> "ResearchIntelligence":
         """Point this run at a (possibly new) study-context handle.
 
         A storage handle belongs to whoever opened it, and an HTTP entry
         serves each request on its own worker. The study id never changes
-        -- only the door onto it. Returns self so a caller can write
+        -- only the door onto it. `trace_sink` swaps the audit-trail sink
+        for the same reason: the previous one points at a closed store.
+        Returns self so a caller can write
         `intelligence.with_study_context(service).resume(...)`.
         """
         self._study_context = service
+        if trace_sink is not None:
+            self._trace_sink = trace_sink
         return self
 
     def run(self, goal: str, *, intent: ResearchIntent | None = None,
@@ -615,8 +632,17 @@ class ResearchIntelligence:
 
         index = 0
         last_issues: list[str] = []
+        #: The turn just finished, waiting to be written to the audit
+        #: trail. Held one turn so the record carries the step id its
+        #: execution produced; flushed at the next turn and after the
+        #: loop, so a process that dies mid-run leaves every completed
+        #: turn on disk and no half-written one.
+        pending: ResearchTurnTrace | None = None
         while stop_reason == "" and index < MAX_INTELLIGENCE_ITERATIONS:
             index += 1
+            if pending is not None:
+                self._emit_turn(pending, diagnostics)
+                pending = None
             spent = self._budget.exhausted(
                 decisions=len(records), tool_calls=tool_calls,
                 model_calls=model_calls,
@@ -634,6 +660,7 @@ class ResearchIntelligence:
                 self._decide(state, session_id, len(records) + 1, model_calls,
                              input_tokens, output_tokens, last_issues)
             records.append(record)
+            pending = self._turn_trace(record, session_id=session_id)
             if decision is None:
                 if record.validation_result is DecisionOutcome.MODEL_UNAVAILABLE:
                     blocked = _blocked_payload(
@@ -715,7 +742,11 @@ class ResearchIntelligence:
                 # The audit row names the step this decision produced, so a
                 # reader can join a decision to its observation.
                 records[-1].associated_step_id = step.step_id
-            self._interpret(decision, observation, interpretations)
+            reading = self._interpret(decision, observation, interpretations)
+            pending = self._turn_trace(
+                records[-1], session_id=session_id, step=step,
+                tool_result=tool_results[-1], observation=observation,
+                interpretation=reading)
             progressed = self._absorbed(
                 decision, observation, state, session_id, diagnostics)
             no_progress = 0 if progressed else no_progress + 1
@@ -729,6 +760,9 @@ class ResearchIntelligence:
 
         ended_at = utc_now_iso()
         elapsed_ms = int((time.perf_counter() - clock) * 1000)
+        if pending is not None:
+            self._emit_turn(pending, diagnostics)
+            pending = None
         if not stop_reason:
             stop_reason = "达到迭代上限"
             blocked = blocked or _blocked_payload(stop_reason, "no_progress")
@@ -745,6 +779,7 @@ class ResearchIntelligence:
             input_tokens=input_tokens, output_tokens=output_tokens,
             state=state)
         self._close_session(result)
+        self._emit_run(result)
         return result
 
     def resume(self, result: IntelligenceRunResult, *,
@@ -802,9 +837,10 @@ class ResearchIntelligence:
             model_provider=provider, model_name=model,
             prompt_version=INTELLIGENCE_PROMPT_VERSION,
         )
-        first = build_user_message(state, budget_note=self._budget.note(
-            decisions=turn - 1, tool_calls=len(state.executed_calls),
-            model_calls=model_calls))
+        first, rendered = build_user_message(state, budget_note=(
+            self._budget.note(
+                decisions=turn - 1, tool_calls=len(state.executed_calls),
+                model_calls=model_calls)))
         if repair_issues:
             messages = [
                 {"role": "user", "content": first},
@@ -829,7 +865,8 @@ class ResearchIntelligence:
                 **base, duration_ms=duration,
                 validation_result=DecisionOutcome.MODEL_UNAVAILABLE,
                 validation_detail=detail,
-                warnings=["模型不可用；本次运行不会退化为固定流程后仍声称是 AI 研究"]),
+                warnings=["模型不可用；本次运行不会退化为固定流程后仍声称是 AI 研究"],
+                context_budget=rendered.summary()),
                 model_calls + 1, input_tokens, output_tokens)
 
         model_calls += 1
@@ -845,7 +882,8 @@ class ResearchIntelligence:
                 validation_detail="回复不是可用的研究决策",
                 warnings=issues,
                 input_tokens=response.input_tokens,
-                output_tokens=response.output_tokens),
+                output_tokens=response.output_tokens,
+                context_budget=rendered.summary()),
                 model_calls, input_tokens, output_tokens)
 
         outcome = self._validator.validate(
@@ -863,7 +901,8 @@ class ResearchIntelligence:
             duration_ms=duration,
             input_tokens=response.input_tokens,
             output_tokens=response.output_tokens,
-            decision=decision if outcome.accepted else None)
+            decision=decision if outcome.accepted else None,
+            context_budget=rendered.summary())
         return (decision if outcome.accepted else None, record,
                 model_calls, input_tokens, output_tokens)
 
@@ -905,17 +944,26 @@ class ResearchIntelligence:
         return step, observation
 
     def _interpret(self, decision: ResearchDecision, observation: Observation,
-                   interpretations: list[ScientificInterpretation]) -> None:
+                   interpretations: list[ScientificInterpretation]
+                   ) -> ScientificInterpretation | None:
+        """Record the model's reading of one result, beside the result.
+
+        Returns the reading (or None when the model offered none) so the
+        caller can attach it to the turn's audit trace without searching
+        the list it just appended to.
+        """
         if not decision.observation_interpretation:
-            return
-        interpretations.append(ScientificInterpretation(
+            return None
+        reading = ScientificInterpretation(
             step_id=observation.step_id, tool=observation.tool,
             observation_kind=observation.kind.value,
             interpretation=decision.observation_interpretation,
             related_hypothesis_ids=list(
                 decision.tool_call.related_hypothesis_ids
                 if decision.tool_call is not None else []),
-            evidence_ids=list(observation.evidence_ids)))
+            evidence_ids=list(observation.evidence_ids))
+        interpretations.append(reading)
+        return reading
 
     # -- state writes -------------------------------------------------------
 
@@ -1039,6 +1087,64 @@ class ResearchIntelligence:
         except CreaError as exc:
             result.diagnostics.append(
                 f"study context write failed: {type(exc).__name__}: {exc}")
+
+    # -- audit-trail persistence (M2.0.1) ----------------------------------
+
+    def _turn_trace(self, record: DecisionRecord, *, session_id: str,
+                    step: ResearchStep | None = None,
+                    tool_result: ToolResult | None = None,
+                    observation: Observation | None = None,
+                    interpretation: ScientificInterpretation | None = None
+                    ) -> ResearchTurnTrace | None:
+        """One audited turn as the persistence layer stores it, or None.
+
+        Built only when a sink and a study exist: without a study there is
+        nothing to key the row by, and without a sink nobody asked for the
+        audit copy. The observation travels as its serialization minus the
+        in-memory `raw` handle; the interpretation travels in its own
+        field, never merged into the observation.
+        """
+        if self._trace_sink is None or not self._study_id:
+            return None
+        call = (record.decision.tool_call
+                if record.decision is not None else None)
+        return ResearchTurnTrace(
+            study_id=self._study_id, session_id=session_id,
+            turn=record.turn, decision_id=record.decision_id,
+            record=record,
+            step=step,
+            step_id=(step.step_id if step is not None
+                     else record.associated_step_id),
+            tool_name=(step.tool if step is not None
+                       else record.selected_tool),
+            arguments=(dict(step.arguments) if step is not None
+                       else (dict(call.arguments) if call is not None
+                             else {})),
+            tool_result=tool_result,
+            observation=(observation.model_dump(mode="json",
+                                                exclude={"raw"})
+                         if observation is not None else None),
+            interpretation=interpretation)
+
+    def _emit_turn(self, trace: ResearchTurnTrace,
+                   diagnostics: list[str]) -> None:
+        """Write one turn to the audit trail. A failure is a diagnostic,
+        never a research failure and never a silent success."""
+        try:
+            self._trace_sink.record_turn(trace)
+        except Exception as exc:  # noqa: BLE001 - persistence is not the loop
+            diagnostics.append(
+                f"trace write failed: {type(exc).__name__}: {exc}")
+
+    def _emit_run(self, result: IntelligenceRunResult) -> None:
+        """Write the run's terminal summary to the audit trail."""
+        if self._trace_sink is None or not self._study_id:
+            return
+        try:
+            self._trace_sink.record_run(_run_trace_of(result))
+        except Exception as exc:  # noqa: BLE001 - persistence is not the loop
+            result.diagnostics.append(
+                f"trace write failed: {type(exc).__name__}: {exc}")
 
     # -- assembly -----------------------------------------------------------
 
@@ -1270,6 +1376,115 @@ def _short(exc: Exception, limit: int = 240) -> str:
     return text if len(text) <= limit else text[:limit] + "…"
 
 
+def _run_trace_of(result: IntelligenceRunResult) -> ResearchRunTrace:
+    """One finished run, as the audit trail stores its summary."""
+    return ResearchRunTrace(
+        study_id=result.study_id, session_id=result.session_id,
+        goal=result.goal, mode=result.mode.value,
+        status=result.status.value, outcome=result.outcome,
+        reason=result.reason, started_at=result.started_at,
+        ended_at=result.ended_at, duration_ms=result.duration_ms,
+        cancelled=result.cancelled,
+        model_provider=result.model_provider,
+        model_name=result.model_name,
+        prompt_version=result.prompt_version,
+        budget=result.budget.model_dump(mode="json"),
+        decisions_used=result.decisions_used,
+        tool_calls_used=result.tool_calls_used,
+        model_calls_used=result.model_calls_used,
+        input_tokens=result.input_tokens,
+        output_tokens=result.output_tokens,
+        evidence_ids=list(result.evidence_ids),
+        hypothesis_ids=list(result.hypothesis_ids),
+        unresolved_items=list(result.unresolved_items),
+        failures=list(result.failures),
+        diagnostics=list(result.diagnostics),
+        awaiting=(result.awaiting.model_dump(mode="json")
+                  if result.awaiting is not None else None),
+        completion=(result.completion.model_dump(mode="json")
+                    if result.completion is not None else None),
+        blocked=(result.blocked.model_dump(mode="json")
+                 if result.blocked is not None else None),
+        record_count=len(result.decision_records))
+
+
+def run_result_from_trace(run: ResearchRunTrace,
+                          turns: list[ResearchTurnTrace]
+                          ) -> IntelligenceRunResult:
+    """The live run's shape, rebuilt from the persisted audit trail (M2.0.1).
+
+    This is an **audit** rebuild, not a task resume: the result can be
+    read, compared and rendered exactly as the process that ran it would
+    render it, but it carries no intelligence instance and no provider --
+    a paused run still cannot be answered from another process, and this
+    function never claims otherwise. Every epistemic category comes from
+    the stored rows as themselves: the gate's own `validation_result`, the
+    observer's own `kind` inside the observation JSON, and the model's
+    interpretation in its own field beside -- never over -- the result.
+    """
+    ordered = sorted(turns, key=lambda t: (t.position or 0, t.turn or 0))
+    records = [t.record for t in ordered]
+    decisions = [t.record.decision for t in ordered
+                 if t.record.decision is not None
+                 and t.record.validation_result is DecisionOutcome.ACCEPTED]
+    steps: list[ResearchStep] = []
+    observations: list[Observation] = []
+    interpretations: list[ScientificInterpretation] = []
+    tool_results: list[ToolResult] = []
+    for turn in ordered:
+        if turn.step is not None:
+            steps.append(turn.step)
+        if turn.tool_result is not None:
+            tool_results.append(turn.tool_result)
+        if turn.observation is not None:
+            try:
+                observations.append(
+                    Observation.model_validate(turn.observation))
+            except Exception:  # noqa: BLE001 - a foreign row is not a crash
+                continue
+        if turn.interpretation is not None:
+            interpretations.append(turn.interpretation)
+
+    awaiting = (IntelligenceAwaiting(**run.awaiting)
+                if run.awaiting else None)
+    completion = (CompletionStatement.model_validate(run.completion)
+                  if run.completion else None)
+    blocked = (BlockedStatement.model_validate(run.blocked)
+               if run.blocked else None)
+    try:
+        budget = ResearchBudget(**(run.budget or {}))
+    except Exception:  # noqa: BLE001 - a foreign budget row is the default
+        budget = ResearchBudget()
+    try:
+        mode = ResearchMode(run.mode)
+    except ValueError:
+        mode = ResearchMode.AI_RESEARCH_INTELLIGENCE
+    try:
+        status = TaskStatus(run.status)
+    except ValueError:
+        status = TaskStatus.PARTIAL
+
+    return IntelligenceRunResult(
+        status=status, outcome=run.outcome, session_id=run.session_id,
+        study_id=run.study_id, mode=mode, reason=run.reason,
+        goal=run.goal, started_at=run.started_at, ended_at=run.ended_at,
+        duration_ms=run.duration_ms, decision_records=records,
+        decisions=decisions, steps=steps, observations=observations,
+        interpretations=interpretations, tool_results=tool_results,
+        awaiting=awaiting, cancelled=run.cancelled,
+        evidence_ids=list(run.evidence_ids),
+        hypothesis_ids=list(run.hypothesis_ids),
+        unresolved_items=list(run.unresolved_items),
+        failures=list(run.failures), diagnostics=list(run.diagnostics),
+        model_provider=run.model_provider, model_name=run.model_name,
+        prompt_version=run.prompt_version or INTELLIGENCE_PROMPT_VERSION,
+        budget=budget, decisions_used=run.decisions_used,
+        tool_calls_used=run.tool_calls_used,
+        model_calls_used=run.model_calls_used,
+        input_tokens=run.input_tokens, output_tokens=run.output_tokens,
+        completion=completion, blocked=blocked)
+
+
 def build_plan_from_decisions(goal: str,
                               decisions: list[ResearchDecision]
                               ) -> ResearchPlan:
@@ -1314,4 +1529,5 @@ __all__ = [
     "ResearchState",
     "ValidationOutcome",
     "build_plan_from_decisions",
+    "run_result_from_trace",
 ]

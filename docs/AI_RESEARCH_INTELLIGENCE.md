@@ -71,9 +71,10 @@ refusal back to it.
 Every turn produces a `DecisionRecord`: session, study, turn, model
 provider and name, prompt version, schema version, decision type,
 summary, selected tool, the validator's ruling and why, timestamp,
-duration, token usage, warnings, and the step the decision produced.
-There is no field for the model's private reasoning, and no hidden
-reasoning is stored.
+duration, token usage, warnings, the step the decision produced, and —
+since M2.0.1 — the prompt-budget accounting (`context_budget`) the turn
+was requested under. There is no field for the model's private
+reasoning, and no hidden reasoning is stored.
 
 ## 3. What the model may and may not do
 
@@ -118,6 +119,34 @@ When one runs out, the run stops with a `BlockedStatement` whose
 reports `partial` (or `failed` when nothing was produced). It never
 reports the research as *complete*.
 
+### The prompt-state budget (M2.0.1)
+
+The state document the model reads is itself budgeted:
+`STATE_BUDGET_CHARS` (24 000) is an **approximate character** bound, not
+a token count, and the rendered document says so
+(`context_budget.approximate`). The first real-model acceptance run
+proved why this matters: with the production 44-tool catalog the full
+schemas alone overflowed the budget, the old truncation loop drained
+`observations` to zero, and the model never saw a single tool result.
+The rule now is enforced by `render_state_document`:
+
+> A tool result the model must reason about outranks the catalog of
+> tools it might call next, which outranks old decision history.
+
+Concretely, when the whole state does not fit: the newest observations
+are kept first (their data may shrink through a preview ladder, always
+flagged `data_truncated_for_prompt`); the tool catalog compresses along
+a ladder — `full` (complete schemas) → `focused` (full schemas for the
+goal-relevant tools, compact entries for the rest) → `compact` (name,
+purpose, parameter names/types, required facts, approval flag) →
+`names` — and **never drops a tool's name**, so the validator can still
+teach any missing schema detail field by field; older decision history
+and signatures fill what is left. Every trim is declared in
+`context_budget` (per-section character usage, catalog mode, omitted
+counts, reasons) and in `state_truncated`; a trimmed state never
+pretends to be whole, and the original `Observation` objects are never
+modified by rendering.
+
 ## 5. Model configuration
 
 No vendor is named anywhere above the provider boundary.
@@ -158,7 +187,9 @@ one, and it never reaches around one.
 What the model is shown about each tool is what the tool declares: name,
 description, argument schema, required session facts, whether a human
 must approve, and its effects. Aliases are hidden — a model names the
-canonical tool.
+canonical tool. Under budget pressure the catalog compresses (see §4);
+the full parameter schema of any tool is one rejected call away, because
+the validator's issues name missing or invalid fields precisely.
 
 ## 7. Study context and the trace
 
@@ -184,6 +215,26 @@ reconstructed from the tools it chose and why. `AiResearchRuntime` maps
 a run onto the M1.4 `RuntimeResult` vocabulary so the M1.7
 `run_blind_case` can drive this loop while keeping its own two-door
 isolation (`get_agent_view` in, `save_trace` out).
+
+### The persisted audit trail (M2.0.1)
+
+Study context remembers what the study *knows*; the audit trail
+remembers what one run *did*. While the run executes, every turn is
+written to `ai_research_turns` (the `DecisionRecord`, the step, the
+arguments, the raw `ToolResult`, the observation JSON and the
+interpretation in separate columns) and the run's terminal summary to
+`ai_research_runs` — both keyed by study first, via
+`ResearchTraceService`. A write failure is a diagnostic on the run, never
+a silent success and never a research failure.
+
+`get`, `decisions`, `report` and `live_result` therefore answer in a
+second process that merely opens the same database: the trail is
+re-read, the `DecisionRecord` order restored, the report re-rendered.
+What a restart still loses is the ability to *continue a pause* —
+`answer` and `cancel` need the live intelligence instance and say so.
+Reading an audit trail is not resuming a task, and nothing here claims
+otherwise. The rows are scrubbed on the way in (§87/§88): no credential
+reaches them, and no GoldenCase reference material can.
 
 ## 8. Product entry
 
@@ -265,12 +316,17 @@ factories. An architecture test pins that it names neither.
 ## 10. Not implemented (later stages)
 
 - Streaming progress over HTTP; the run is synchronous today.
-- Resuming a pause across a process restart. The audit trail persists in
-  the study context; the ability to *answer* that pause lives in the
+- Resuming a pause across a process restart. Since M2.0.1 the **audit
+  trail** (every `DecisionRecord`, tool result, observation,
+  interpretation and the run summary) survives a restart and is readable
+  and reportable from any process holding the database; what does not
+  survive is the ability to *answer* that pause, which lives in the
   process that started it.
 - Multi-user identity, roles, or an authenticated `actor`.
-- Token-budget-aware prompt truncation by real tokenizer counts — the
-  state document is bounded by characters.
+- Token-accurate prompt budgeting — the state document is bounded by
+  characters, and since M2.0.1 that bound is priority-allocated and
+  fully accounted (`context_budget`), but it is still characters, not
+  tokenizer counts.
 - Any change to the chemistry, the literature providers or the document
   pipeline.
 

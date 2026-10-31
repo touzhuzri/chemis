@@ -42,7 +42,7 @@ The baseline therefore has two columns everywhere: *what the loop does*
 | 5 | The AI identifies evidence gaps and uncertainty | **Verified with a scripted provider** | Case D/F; `evidence_sufficiency`, `unresolved_questions` and `limitations` all reach the report |
 | 6 | The AI asks the user when it should | **Verified with a scripted provider** | Case B; the pause carries the question and the options, and an unanswered question is never recorded as an answer |
 | 7 | The AI keeps researching and stops inside a budget | **Verified** | Case G; every bound is charged on the execution path |
-| 8 | Research can be saved, resumed and audited | **Partly verified** | Facts, hypotheses, decisions, issues and session summaries persist through `StudyContext`; every turn is a `DecisionRecord`. Resuming works **within one process**; across a restart only the audit trail survives |
+| 8 | Research can be saved, resumed and audited | **Partly verified** | Facts, hypotheses, decisions, issues and session summaries persist through `StudyContext`; every turn is a `DecisionRecord`. Since M2.0.1 the full audit trail (records, tool results, observations, interpretations, run summary) persists in SQLite and is readable and reportable from another process (`ai_research_turns` / `ai_research_runs`); resuming a *pause* still works only within the process that started it |
 | 9 | The AI cannot bypass tool permissions or scientific truth | **Verified** | The validator and registry gates listed in `AI_RESEARCH_INTELLIGENCE.md` §3, each with a test |
 | 10 | Golden Cases demonstrate the above | **Yes, with the caveat at the top** | Cases A–G in `tests/ai/test_research_intelligence.py` |
 
@@ -53,8 +53,11 @@ The baseline therefore has two columns everywhere: *what the loop does*
    openai-compatible`, `CREA_LLM_API_KEY`) but has not been exercised as
    an evaluation here, and no claim is made about its scientific quality.
 2. **No cross-process pause resume.** A paused run can be answered by the
-   process that started it. The decisions and the study context persist;
-   the paused handle does not.
+   process that started it. Since M2.0.1 the complete audit trail -- every
+   `DecisionRecord` with its tool result, observation and interpretation,
+   plus the run summary -- persists in SQLite and can be read and rendered
+   by another process; what does not survive the restart is the paused
+   *handle*, i.e. the ability to continue the run.
 3. **No streaming progress.** A run is synchronous. The HTTP entry
    returns the whole result.
 4. **No authenticated identity.** `study_id` and an approval are
